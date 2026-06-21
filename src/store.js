@@ -89,7 +89,8 @@ function seedData() {
       status: "online",
       valve: "open",
       battery: 86,
-      installedAt: "2025-09-01"
+      installedAt: "2025-09-01",
+      token: "devtoken_meter_101_secret"
     },
     {
       id: "dev_valve_101",
@@ -99,7 +100,8 @@ function seedData() {
       status: "online",
       valve: "open",
       battery: 79,
-      installedAt: "2025-09-01"
+      installedAt: "2025-09-01",
+      token: "devtoken_valve_101_secret"
     },
     {
       id: "dev_meter_202",
@@ -109,7 +111,8 @@ function seedData() {
       status: "online",
       valve: "open",
       battery: 67,
-      installedAt: "2025-11-15"
+      installedAt: "2025-11-15",
+      token: "devtoken_meter_202_secret"
     }
   ];
 
@@ -292,6 +295,90 @@ class Store {
     }
     this.write();
     return plan;
+  }
+
+  findDeviceByToken(token) {
+    return this.data.devices.find((device) => device.token === token);
+  }
+
+  addReading(input) {
+    const device = this.data.devices.find((item) => item.id === input.deviceId);
+    if (!device) {
+      const error = new Error("设备不存在");
+      error.status = 404;
+      throw error;
+    }
+    if (device.type !== "meter") {
+      const error = new Error("设备类型不支持读数上报");
+      error.status = 400;
+      throw error;
+    }
+    if (device.status !== "online") {
+      const error = new Error("设备离线，无法接收读数");
+      error.status = 409;
+      throw error;
+    }
+    if (device.homeId !== input.homeId) {
+      const error = new Error("设备归属家庭不匹配");
+      error.status = 400;
+      throw error;
+    }
+
+    const usage = Number(input.usage);
+    const pressure = Number(input.pressure);
+    const temperature = Number(input.temperature);
+    const at = input.at ? new Date(input.at) : new Date();
+
+    if (isNaN(at.getTime())) {
+      const error = new Error("采集时间格式无效");
+      error.status = 400;
+      throw error;
+    }
+    if (at.getTime() > Date.now() + 60000) {
+      const error = new Error("采集时间不能晚于当前时间");
+      error.status = 400;
+      throw error;
+    }
+    if (isNaN(usage) || usage < 0 || usage > 100) {
+      const error = new Error("用水量数值无效");
+      error.status = 400;
+      throw error;
+    }
+    if (isNaN(pressure) || pressure < 0 || pressure > 2) {
+      const error = new Error("压力数值无效");
+      error.status = 400;
+      throw error;
+    }
+    if (isNaN(temperature) || temperature < -20 || temperature > 100) {
+      const error = new Error("温度数值无效");
+      error.status = 400;
+      throw error;
+    }
+
+    const atStr = at.toISOString();
+    const minuteKey = atStr.slice(0, 16);
+    const isDuplicate = this.data.readings.some(
+      (r) => r.deviceId === device.id && r.at.slice(0, 16) === minuteKey
+    );
+    if (isDuplicate) {
+      const error = new Error("重复读数，同一分钟内已存在该设备读数");
+      error.status = 409;
+      throw error;
+    }
+
+    const reading = {
+      id: randomId("rd"),
+      homeId: device.homeId,
+      deviceId: device.id,
+      at: atStr,
+      usage: Number(usage.toFixed(2)),
+      pressure: Number(pressure.toFixed(2)),
+      temperature: Number(temperature.toFixed(1))
+    };
+
+    this.data.readings.push(reading);
+    this.write();
+    return reading;
   }
 }
 

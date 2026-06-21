@@ -99,3 +99,212 @@ test("dashboard supports filtering by homeIds", async (t) => {
   assert.equal(dashboardReset.status, 200);
   assert.equal(dashboardReset.body.cards.homes, 2);
 });
+
+test("device reading submission works with valid token and data", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const beforeCount = store.data.readings.length;
+  const at = new Date(Date.now() - 3600000).toISOString();
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      at,
+      usage: 0.55,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  assert.equal(result.status, 201);
+  assert.ok(result.body.reading);
+  assert.equal(result.body.reading.deviceId, "dev_meter_101");
+  assert.equal(result.body.reading.homeId, "home_101");
+  assert.equal(result.body.reading.usage, 0.55);
+  assert.equal(store.data.readings.length, beforeCount + 1);
+});
+
+test("device reading rejects invalid token", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const beforeCount = store.data.readings.length;
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer invalid_token" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      usage: 0.55,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  assert.equal(result.status, 401);
+  assert.equal(store.data.readings.length, beforeCount);
+});
+
+test("device reading rejects valve device type", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const beforeCount = store.data.readings.length;
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_valve_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      usage: 0.55,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(store.data.readings.length, beforeCount);
+});
+
+test("device reading rejects mismatched homeId", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const beforeCount = store.data.readings.length;
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_202",
+      usage: 0.55,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(store.data.readings.length, beforeCount);
+});
+
+test("device reading rejects invalid usage value", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const beforeCount = store.data.readings.length;
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      usage: -5,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(store.data.readings.length, beforeCount);
+});
+
+test("device reading rejects duplicate reading in same minute", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const at = new Date(Date.now() - 7200000).toISOString();
+  const beforeCount = store.data.readings.length;
+
+  const first = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      at,
+      usage: 0.55,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+  assert.equal(first.status, 201);
+  assert.equal(store.data.readings.length, beforeCount + 1);
+
+  const second = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      at,
+      usage: 0.66,
+      pressure: 0.29,
+      temperature: 21.0
+    })
+  });
+  assert.equal(second.status, 409);
+  assert.equal(store.data.readings.length, beforeCount + 1);
+});
+
+test("failed reading does not pollute dashboard stats", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const dashboardBefore = await request(baseUrl, "/api/dashboard", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  const usageBefore = dashboardBefore.body.cards.monthUsage;
+  const countBefore = store.data.readings.length;
+
+  await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    body: JSON.stringify({
+      homeId: "home_101",
+      usage: -999,
+      pressure: 0.28,
+      temperature: 20.5
+    })
+  });
+
+  const dashboardAfter = await request(baseUrl, "/api/dashboard", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+
+  assert.equal(store.data.readings.length, countBefore);
+  assert.equal(dashboardAfter.body.cards.monthUsage, usageBefore);
+});

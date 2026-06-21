@@ -68,6 +68,23 @@ function createApp(options = {}) {
     return auth;
   }
 
+  function currentDevice(req) {
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!bearer) return null;
+    return store.findDeviceByToken(bearer);
+  }
+
+  function requireDevice(req) {
+    const device = currentDevice(req);
+    if (!device) {
+      const error = new Error("设备认证失败");
+      error.status = 401;
+      throw error;
+    }
+    return device;
+  }
+
   function scopedHomeGuard(user, homeId) {
     if (!visibleHomeIds(store.data, user).includes(homeId)) {
       const error = new Error("无权访问该家庭");
@@ -175,6 +192,16 @@ function createApp(options = {}) {
       scopedHomeGuard(user, reportMatch[1]);
       const report = buildReport(store.data, reportMatch[1]);
       return report ? send(res, 200, report) : send(res, 404, { message: "家庭不存在" });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/device/readings") {
+      const device = requireDevice(req);
+      const body = await parseBody(req);
+      const reading = store.addReading({
+        ...body,
+        deviceId: device.id
+      });
+      return send(res, 201, { reading });
     }
 
     return send(res, 404, { message: "接口不存在" });
