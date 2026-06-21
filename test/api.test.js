@@ -108,12 +108,13 @@ test("device reading submission works with valid token and data", async (t) => {
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
+  const meter101 = store.data.devices.find((d) => d.id === "dev_meter_101");
   const beforeCount = store.data.readings.length;
   const at = new Date(Date.now() - 3600000).toISOString();
 
   const result = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       at,
@@ -164,11 +165,12 @@ test("device reading rejects valve device type", async (t) => {
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
+  const valve101 = store.data.devices.find((d) => d.id === "dev_valve_101");
   const beforeCount = store.data.readings.length;
 
   const result = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_valve_101_secret" },
+    headers: { Authorization: `Bearer ${valve101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       usage: 0.55,
@@ -189,11 +191,12 @@ test("device reading rejects mismatched homeId", async (t) => {
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
+  const meter101 = store.data.devices.find((d) => d.id === "dev_meter_101");
   const beforeCount = store.data.readings.length;
 
   const result = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_202",
       usage: 0.55,
@@ -214,11 +217,12 @@ test("device reading rejects invalid usage value", async (t) => {
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
+  const meter101 = store.data.devices.find((d) => d.id === "dev_meter_101");
   const beforeCount = store.data.readings.length;
 
   const result = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       usage: -5,
@@ -239,12 +243,13 @@ test("device reading rejects duplicate reading in same minute", async (t) => {
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
+  const meter101 = store.data.devices.find((d) => d.id === "dev_meter_101");
   const at = new Date(Date.now() - 7200000).toISOString();
   const beforeCount = store.data.readings.length;
 
   const first = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       at,
@@ -258,7 +263,7 @@ test("device reading rejects duplicate reading in same minute", async (t) => {
 
   const second = await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       at,
@@ -290,9 +295,10 @@ test("failed reading does not pollute dashboard stats", async (t) => {
   const usageBefore = dashboardBefore.body.cards.monthUsage;
   const countBefore = store.data.readings.length;
 
+  const meter101 = store.data.devices.find((d) => d.id === "dev_meter_101");
   await request(baseUrl, "/api/device/readings", {
     method: "POST",
-    headers: { Authorization: "Bearer devtoken_meter_101_secret" },
+    headers: { Authorization: `Bearer ${meter101.token}` },
     body: JSON.stringify({
       homeId: "home_101",
       usage: -999,
@@ -307,4 +313,65 @@ test("failed reading does not pollute dashboard stats", async (t) => {
 
   assert.equal(store.data.readings.length, countBefore);
   assert.equal(dashboardAfter.body.cards.monthUsage, usageBefore);
+});
+
+test("migration fills token for legacy store without token", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const storeFile = path.join(dir, "store.json");
+  const legacyData = {
+    users: [
+      {
+        id: "usr_resident",
+        name: "测试用户",
+        account: "resident",
+        role: "resident",
+        status: "active",
+        passwordHash: "salt:hash"
+      }
+    ],
+    homes: [
+      { id: "home_test", name: "测试家庭", ownerId: "usr_resident" }
+    ],
+    devices: [
+      {
+        id: "dev_meter_test",
+        homeId: "home_test",
+        name: "测试水表",
+        type: "meter",
+        status: "online",
+        valve: "open"
+      }
+    ],
+    readings: [],
+    alerts: [],
+    plans: [],
+    commands: [],
+    settings: { initialized: true }
+  };
+  fs.writeFileSync(storeFile, JSON.stringify(legacyData, null, 2));
+
+  const store = new Store(storeFile);
+
+  const device = store.data.devices.find((d) => d.id === "dev_meter_test");
+  assert.ok(device.token, "迁移后设备应已生成 token");
+  assert.ok(device.token.length > 10, "token 长度应合理");
+  assert.equal(store.data.settings.migrationVersion, 1, "迁移版本号应更新为 1");
+  assert.ok(store.data._migrations?.length > 0, "迁移历史应已记录");
+
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const result = await request(baseUrl, "/api/device/readings", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${device.token}` },
+    body: JSON.stringify({
+      homeId: "home_test",
+      usage: 0.42,
+      pressure: 0.25,
+      temperature: 18.0
+    })
+  });
+  assert.equal(result.status, 201, "迁移后的设备 token 应可正常认证");
 });

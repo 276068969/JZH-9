@@ -59,7 +59,8 @@
       "status": "online",
       "valve": "open",
       "battery": 86,
-      "installedAt": "2025-09-01"
+      "installedAt": "2025-09-01",
+      "token": "dev_dev_meter_101_751b9fab8948626f"
     },
     {
       "id": "dev_valve_101",
@@ -69,7 +70,8 @@
       "status": "online",
       "valve": "open",
       "battery": 79,
-      "installedAt": "2025-09-01"
+      "installedAt": "2025-09-01",
+      "token": "dev_dev_valve_101_20c13acc22311568"
     },
     {
       "id": "dev_meter_202",
@@ -79,7 +81,8 @@
       "status": "online",
       "valve": "open",
       "battery": 67,
-      "installedAt": "2025-11-15"
+      "installedAt": "2025-11-15",
+      "token": "dev_dev_meter_202_25417888e4346382"
     }
   ],
   "readings": [
@@ -659,6 +662,21 @@
   ],
   "commands": [],
   "settings": {
-    "initialized": true
-  }
+    "initialized": true,
+    "migrationVersion": 1
+  },
+  "_migrations": [
+    {
+      "at": "2026-06-21T09:06:09.654Z",
+      "from": 0,
+      "to": 1,
+      "logs": [
+        "[MIGRATION] 执行版本 1：为设备补全认证 token",
+        "[MIGRATION]   - 设备 dev_meter_101 (101 智能水表) 已生成 token",
+        "[MIGRATION]   - 设备 dev_valve_101 (101 入户阀门) 已生成 token",
+        "[MIGRATION]   - 设备 dev_meter_202 (202 智能水表) 已生成 token",
+        "[MIGRATION] 版本 1 完成：共 3 个设备，补全 3 个 token"
+      ]
+    }
+  ]
 }

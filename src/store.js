@@ -90,7 +90,7 @@ function seedData() {
       valve: "open",
       battery: 86,
       installedAt: "2025-09-01",
-      token: "devtoken_meter_101_secret"
+      token: generateDeviceToken("dev_meter_101")
     },
     {
       id: "dev_valve_101",
@@ -101,7 +101,7 @@ function seedData() {
       valve: "open",
       battery: 79,
       installedAt: "2025-09-01",
-      token: "devtoken_valve_101_secret"
+      token: generateDeviceToken("dev_valve_101")
     },
     {
       id: "dev_meter_202",
@@ -112,7 +112,7 @@ function seedData() {
       valve: "open",
       battery: 67,
       installedAt: "2025-11-15",
-      token: "devtoken_meter_202_secret"
+      token: generateDeviceToken("dev_meter_202")
     }
   ];
 
@@ -181,9 +181,53 @@ function seedData() {
     ],
     commands: [],
     settings: {
-      initialized: true
+      initialized: true,
+      migrationVersion: 1
     }
   };
+}
+
+function generateDeviceToken(deviceId) {
+  const suffix = crypto.randomBytes(8).toString("hex");
+  const idPart = deviceId.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 16);
+  return `dev_${idPart}_${suffix}`;
+}
+
+function runMigrations(data, store) {
+  const currentVersion = data.settings?.migrationVersion || 0;
+  const logs = [];
+  let dirty = false;
+
+  if (currentVersion < 1) {
+    logs.push(`[MIGRATION] 执行版本 1：为设备补全认证 token`);
+    const beforeCount = (data.devices || []).length;
+    let migrated = 0;
+    (data.devices || []).forEach((device) => {
+      if (!device.token) {
+        device.token = generateDeviceToken(device.id);
+        migrated += 1;
+        logs.push(`[MIGRATION]   - 设备 ${device.id} (${device.name}) 已生成 token`);
+      }
+    });
+    if (!data.settings) data.settings = {};
+    data.settings.migrationVersion = 1;
+    if (!data.settings.initialized) data.settings.initialized = true;
+    logs.push(`[MIGRATION] 版本 1 完成：共 ${beforeCount} 个设备，补全 ${migrated} 个 token`);
+    dirty = true;
+  }
+
+  if (dirty && logs.length > 0) {
+    if (!data._migrations) data._migrations = [];
+    data._migrations.push({
+      at: new Date().toISOString(),
+      from: currentVersion,
+      to: data.settings.migrationVersion,
+      logs: [...logs]
+    });
+    logs.forEach((line) => console.log(line));
+  }
+
+  return dirty;
 }
 
 function ensureFile(file) {
@@ -202,6 +246,9 @@ class Store {
     if (!this.data.settings || !this.data.settings.initialized || !this.data.users?.length) {
       this.data = seedData();
       this.write();
+    } else {
+      const migrated = runMigrations(this.data, this);
+      if (migrated) this.write();
     }
   }
 
