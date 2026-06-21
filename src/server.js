@@ -155,21 +155,50 @@ function createApp(options = {}) {
     if (req.method === "GET" && url.pathname === "/api/alerts") {
       const { user } = requireUser(req);
       const ids = visibleHomeIds(store.data, user);
-      return send(res, 200, { alerts: store.data.alerts.filter((alert) => ids.includes(alert.homeId)) });
+      return send(res, 200, {
+        alerts: store.data.alerts
+          .filter((alert) => ids.includes(alert.homeId))
+          .map((alert) => store.publicAlert(alert, { withHistory: false }))
+      });
     }
 
     const alertMatch = url.pathname.match(/^\/api\/alerts\/([^/]+)$/);
-    if (alertMatch && req.method === "PATCH") {
-      const { user } = requireUser(req, ["admin", "operator"]);
+    if (alertMatch) {
+      if (req.method === "GET") {
+        const { user } = requireUser(req);
+        const alert = store.getAlert(alertMatch[1]);
+        if (!alert) return send(res, 404, { message: "告警不存在" });
+        scopedHomeGuard(user, alert.homeId);
+        return send(res, 200, { alert: store.publicAlert(alert, { withHistory: true }) });
+      }
+      if (req.method === "PATCH") {
+        const { user } = requireUser(req, ["admin", "operator"]);
+        const body = await parseBody(req);
+        const alert = store.getAlert(alertMatch[1]);
+        if (!alert) return send(res, 404, { message: "告警不存在" });
+        scopedHomeGuard(user, alert.homeId);
+        const updated = store.handleAlert(alertMatch[1], body, user);
+        return send(res, 200, { alert: store.publicAlert(updated, { withHistory: true }) });
+      }
+    }
+
+    const alertObjectionMatch = url.pathname.match(/^\/api\/alerts\/([^/]+)\/objections$/);
+    if (alertObjectionMatch && req.method === "POST") {
+      const { user } = requireUser(req, ["resident", "admin", "operator"]);
       const body = await parseBody(req);
-      const alert = store.data.alerts.find((item) => item.id === alertMatch[1]);
+      const alert = store.getAlert(alertObjectionMatch[1]);
       if (!alert) return send(res, 404, { message: "告警不存在" });
       scopedHomeGuard(user, alert.homeId);
-      alert.status = body.status || alert.status;
-      alert.handledBy = user.id;
-      alert.handledAt = new Date().toISOString();
-      store.write();
-      return send(res, 200, { alert });
+      if (user.role === "resident") {
+        const home = store.data.homes.find((h) => h.id === alert.homeId);
+        if (!home || home.ownerId !== user.id) {
+          const error = new Error("无权对该家庭告警提出异议");
+          error.status = 403;
+          throw error;
+        }
+      }
+      const updated = store.addObjection(alertObjectionMatch[1], body, user);
+      return send(res, 201, { alert: store.publicAlert(updated, { withHistory: true }) });
     }
 
     if (req.method === "POST" && url.pathname === "/api/commands") {

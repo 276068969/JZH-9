@@ -26,6 +26,8 @@ function buildDashboard(data, user, filterHomeIds) {
   const devices = data.devices.filter((device) => homeIds.includes(device.homeId));
   const usage = monthUsage(readings);
   const quota = homes.reduce((sum, home) => sum + Number(home.monthlyQuota || 0), 0);
+  const userName = (id) =>
+    id ? (data.users.find((item) => item.id === id)?.name || null) : null;
 
   const recentDaily = readings
     .reduce((map, reading) => {
@@ -56,7 +58,21 @@ function buildDashboard(data, user, filterHomeIds) {
       riskScore
     },
     dailySeries,
-    alerts: alerts.slice(0, 8),
+    alerts: alerts.slice(0, 8).map((alert) => ({
+      id: alert.id,
+      homeId: alert.homeId,
+      level: alert.level,
+      type: alert.type,
+      title: alert.title,
+      detail: alert.detail,
+      status: alert.status,
+      createdAt: alert.createdAt,
+      handledBy: alert.handledBy || null,
+      handledAt: alert.handledAt || null,
+      handledByName: userName(alert.handledBy),
+      resolvedAt: alert.resolvedAt || null,
+      acceptance: alert.acceptance || null
+    })),
     homes,
     devices,
     plans: data.plans.filter((plan) => homeIds.includes(plan.homeId)),

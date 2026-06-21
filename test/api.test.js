@@ -315,6 +315,286 @@ test("failed reading does not pollute dashboard stats", async (t) => {
   assert.equal(dashboardAfter.body.cards.monthUsage, usageBefore);
 });
 
+test("admin can process alert with note and history is recorded", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const before = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(before.status, 200);
+  assert.equal(before.body.alert.status, "open");
+  assert.equal(before.body.alert.history.length, 0);
+  assert.equal(before.body.alert.handledByName, null);
+
+  const patch = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "processing", note: "已联系住户，安排明天上门检修马桶水箱。" })
+  });
+  assert.equal(patch.status, 200);
+  assert.equal(patch.body.alert.status, "processing");
+  assert.equal(patch.body.alert.handledBy, "usr_admin");
+  assert.ok(patch.body.alert.handledAt);
+  assert.equal(patch.body.alert.handledByName, "系统管理员");
+  assert.equal(patch.body.alert.history.length, 1);
+  assert.equal(patch.body.alert.history[0].note, "已联系住户，安排明天上门检修马桶水箱。");
+  assert.equal(patch.body.alert.history[0].handledBy, "usr_admin");
+  assert.equal(patch.body.alert.history[0].handledByName, "系统管理员");
+  assert.equal(patch.body.alert.history[0].status, "processing");
+
+  const after = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(after.body.alert.history.length, 1);
+  assert.equal(after.body.alert.status, "processing");
+});
+
+test("processing alert requires a non-empty note", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const missing = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "resolved" })
+  });
+  assert.equal(missing.status, 400);
+
+  const blank = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "resolved", note: "   " })
+  });
+  assert.equal(blank.status, 400);
+
+  const detail = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.body.alert.status, "open");
+  assert.equal(detail.body.alert.history.length, 0);
+});
+
+test("processing alert rejects invalid status", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const patch = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "invalid", note: "测试无效状态" })
+  });
+  assert.equal(patch.status, 400);
+
+  const detail = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.body.alert.status, "open");
+});
+
+test("resident cannot modify alert records", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "resident", password: "Home@123" })
+  });
+
+  const patch = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "resolved", note: "住户尝试处理" })
+  });
+  assert.equal(patch.status, 403);
+
+  const detail = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.body.alert.status, "open");
+  assert.equal(detail.body.alert.history.length, 0);
+});
+
+test("resident can view own home alert detail but not other homes", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "resident", password: "Home@123" })
+  });
+
+  const own = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(own.status, 200);
+  assert.equal(own.body.alert.id, "alt_leak_101");
+  assert.ok(Array.isArray(own.body.alert.history));
+
+  const other = await request(baseUrl, "/api/alerts/alt_pressure_202", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(other.status, 403);
+
+  const list = await request(baseUrl, "/api/alerts", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(list.status, 200);
+  assert.equal(list.body.alerts.length, 1);
+  assert.equal(list.body.alerts[0].homeId, "home_101");
+  assert.equal(list.body.alerts[0].handledByName, null);
+});
+
+test("seed processing alert exposes history with handler name", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const detail = await request(baseUrl, "/api/alerts/alt_pressure_202", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.alert.status, "processing");
+  assert.equal(detail.body.alert.history.length, 1);
+  assert.equal(detail.body.alert.history[0].handledByName, "运维值班员");
+  assert.equal(detail.body.alert.handledByName, "运维值班员");
+});
+
+test("operator can process alert and multiple records append to timeline", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "operator", password: "Ops@12345" })
+  });
+
+  const first = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "processing", note: "第一次跟进：电话联系住户确认时段。" })
+  });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.alert.handledBy, "usr_operator");
+
+  await request(baseUrl, "/api/alerts/alt_leak_101", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    body: JSON.stringify({ status: "resolved", note: "第二次跟进：上门更换密封圈并复测无渗漏，闭环。" })
+  });
+
+  const detail = await request(baseUrl, "/api/alerts/alt_leak_101", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.body.alert.status, "resolved");
+  assert.equal(detail.body.alert.history.length, 2);
+  assert.equal(detail.body.alert.history[0].note, "第一次跟进：电话联系住户确认时段。");
+  assert.equal(detail.body.alert.history[1].note, "第二次跟进：上门更换密封圈并复测无渗漏，闭环。");
+  assert.equal(detail.body.alert.history[1].status, "resolved");
+});
+
+test("alert detail returns 404 for missing alert", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const detail = await request(baseUrl, "/api/alerts/alt_not_exist", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+  assert.equal(detail.status, 404);
+});
+
+test("migration backfills history array for legacy alerts", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const storeFile = path.join(dir, "store.json");
+  const legacyData = {
+    users: [
+      { id: "usr_admin", name: "管理员", account: "admin", role: "admin", status: "active", passwordHash: "salt:hash" }
+    ],
+    homes: [{ id: "home_1", name: "家庭", ownerId: "usr_admin" }],
+    devices: [],
+    readings: [],
+    alerts: [
+      {
+        id: "alt_legacy",
+        homeId: "home_1",
+        level: "high",
+        type: "leak",
+        title: "历史漏水",
+        detail: "迁移前创建的告警",
+        status: "open",
+        createdAt: "2026-01-01T00:00:00.000Z"
+      }
+    ],
+    plans: [],
+    commands: [],
+    settings: { initialized: true, migrationVersion: 1 }
+  };
+  fs.writeFileSync(storeFile, JSON.stringify(legacyData, null, 2));
+
+  const store = new Store(storeFile);
+  const alert = store.data.alerts.find((a) => a.id === "alt_legacy");
+  assert.ok(Array.isArray(alert.history), "迁移后告警应包含 history 数组");
+  assert.equal(alert.handledBy, null);
+  assert.ok(alert.acceptance, "迁移后告警应包含 acceptance 字段");
+  assert.equal(store.data.settings.migrationVersion, 3, "迁移版本号应更新为 3");
+});
+
 test("migration fills token for legacy store without token", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
   const storeFile = path.join(dir, "store.json");
@@ -355,7 +635,7 @@ test("migration fills token for legacy store without token", async (t) => {
   const device = store.data.devices.find((d) => d.id === "dev_meter_test");
   assert.ok(device.token, "迁移后设备应已生成 token");
   assert.ok(device.token.length > 10, "token 长度应合理");
-  assert.equal(store.data.settings.migrationVersion, 1, "迁移版本号应更新为 1");
+  assert.equal(store.data.settings.migrationVersion, 3, "迁移版本号应更新为 3");
   assert.ok(store.data._migrations?.length > 0, "迁移历史应已记录");
 
   const server = http.createServer(createApp({ store }));

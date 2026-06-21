@@ -3,7 +3,9 @@ const state = {
   user: null,
   dashboard: null,
   view: "dashboard",
-  selectedHomeIds: []
+  selectedHomeIds: [],
+  selectedAlertId: null,
+  selectedAlert: null
 };
 
 const ROLE_LABEL = {
@@ -12,8 +14,41 @@ const ROLE_LABEL = {
   resident: "家庭用户"
 };
 
+const STATUS_LABEL = {
+  open: "待处理",
+  processing: "处理中",
+  resolved: "已处理",
+  disputed: "有异议"
+};
+
+const HISTORY_TYPE_LABEL = {
+  handle: "处理记录",
+  objection: "异议记录"
+};
+
+const ACCEPTANCE_TYPE_LABEL = {
+  default: "系统默认接受",
+  manual: "用户手动接受",
+  none: "未接受"
+};
+
+const LEVEL_LABEL = {
+  high: "高",
+  medium: "中",
+  low: "低"
+};
+
 function qs(selector) {
   return document.querySelector(selector);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 async function api(path, options = {}) {
@@ -246,11 +281,11 @@ function renderDashboard() {
 function renderAlertItem(alert) {
   return `
     <article class="list-item">
-      <strong>${alert.title}</strong>
-      <span>${alert.detail}</span>
+      <strong>${escapeHtml(alert.title)}</strong>
+      <span>${escapeHtml(alert.detail)}</span>
       <div class="meta">
-        <span class="tag ${alert.level}">${alert.level}</span>
-        <span>${alert.status}</span>
+        <span class="tag ${alert.level}">${LEVEL_LABEL[alert.level] || alert.level}</span>
+        <span class="tag ${alert.status}">${STATUS_LABEL[alert.status] || alert.status}</span>
         <span>${formatDate(alert.createdAt)}</span>
       </div>
     </article>
@@ -330,48 +365,235 @@ function renderHomes() {
   });
 }
 
+async function loadAlertDetail(alertId) {
+  const data = await api(`/api/alerts/${alertId}`);
+  state.selectedAlert = data.alert;
+}
+
 function renderAlerts() {
-  const alerts = state.dashboard.alerts;
+  let alerts = [];
   renderShell(`
     <div class="topbar">
       <div class="page-title">
         <h1>异常告警</h1>
-        <p>跟踪漏水、压力、电量和设备离线等事件。</p>
+        <p>跟踪漏水、压力、电量和设备离线等事件，记录处理进展与闭环历史。</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshAlertsBtn">刷新</button>
       </div>
     </div>
-    <section class="list">
-      ${alerts
-        .map(
-          (alert) => `
-            <article class="list-item">
-              <strong>${alert.title}</strong>
-              <span>${alert.detail}</span>
-              <div class="meta">
-                <span class="tag ${alert.level}">${alert.level}</span>
-                <span>${alert.status}</span>
-                <span>${formatDate(alert.createdAt)}</span>
-              </div>
-              ${
-                ["admin", "operator"].includes(state.user.role)
-                  ? `<div class="actions"><button data-alert="${alert.id}" data-status="resolved">标记已处理</button><button class="secondary" data-alert="${alert.id}" data-status="processing">处理中</button></div>`
-                  : ""
-              }
-            </article>
-          `
-        )
-        .join("")}
+    <section class="list" id="alertList">
+      <div class="list-item">告警加载中…</div>
     </section>
   `);
-  document.querySelectorAll("[data-alert]").forEach((button) => {
+  qs("#refreshAlertsBtn").addEventListener("click", () => renderAlerts());
+  api("/api/alerts")
+    .then((data) => {
+      alerts = data.alerts || [];
+      renderAlertList(alerts);
+    })
+    .catch((error) => {
+      qs("#alertList").innerHTML = `<div class="list-item">${escapeHtml(error.message)}</div>`;
+    });
+}
+
+function renderAlertList(alerts) {
+  const listEl = qs("#alertList");
+  if (!listEl) return;
+  if (!alerts.length) {
+    listEl.innerHTML = "<div class='list-item'>暂无告警</div>";
+    return;
+  }
+  listEl.innerHTML = alerts
+    .map(
+      (alert) => `
+      <article class="list-item">
+        <strong>${escapeHtml(alert.title)}</strong>
+        <span>${escapeHtml(alert.detail)}</span>
+        <div class="meta">
+          <span class="tag ${alert.level}">${LEVEL_LABEL[alert.level] || alert.level}</span>
+          <span class="tag ${alert.status}">${STATUS_LABEL[alert.status] || alert.status}</span>
+          <span>发生时间：${formatDate(alert.createdAt)}</span>
+          ${alert.handledByName ? `<span>处理人：${escapeHtml(alert.handledByName)}</span>` : ""}
+          ${alert.handledAt ? `<span>最近处理：${formatDate(alert.handledAt)}</span>` : ""}
+        </div>
+        <div class="actions">
+          <button data-detail="${alert.id}">查看详情</button>
+        </div>
+      </article>
+    `
+    )
+    .join("");
+  listEl.querySelectorAll("[data-detail]").forEach((button) => {
     button.addEventListener("click", async () => {
-      await api(`/api/alerts/${button.dataset.alert}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: button.dataset.status })
-      });
-      await loadDashboard();
-      renderAlerts();
+      state.selectedAlertId = button.dataset.detail;
+      state.view = "alertDetail";
+      try {
+        await loadAlertDetail(state.selectedAlertId);
+        renderAlertDetail();
+      } catch (error) {
+        state.view = "alerts";
+        renderApp();
+      }
     });
   });
+}
+
+function renderAcceptanceInfo(alert) {
+  const acc = alert.acceptance || {};
+  if (!acc.accepted && acc.daysUntilAccept === null) {
+    return "";
+  }
+  if (acc.accepted) {
+    return `<div class="notice success">
+      <strong>处理结果已接受</strong>（${ACCEPTANCE_TYPE_LABEL[acc.acceptanceType] || acc.acceptanceType}）
+      ${acc.acceptedAt ? `，接受时间：${formatDate(acc.acceptedAt)}` : ""}
+    </div>`;
+  }
+  return `<div class="notice warning">
+    <strong>接受倒计时</strong>：处理完成后 ${acc.defaultAcceptanceDays || 14} 天内未提出异议，系统将默认接受处理结果。
+    剩余 <strong>${acc.daysUntilAccept}</strong> 天。
+  </div>`;
+}
+
+function renderAlertDetail() {
+  const alert = state.selectedAlert;
+  if (!alert) {
+    state.view = "alerts";
+    return renderApp();
+  }
+  const canHandle = ["admin", "operator"].includes(state.user.role);
+  const isResident = state.user.role === "resident";
+  const statusOptions = ["open", "processing", "resolved", "disputed"];
+  const history = alert.history || [];
+  const acc = alert.acceptance || {};
+  const canObject = isResident && !acc.accepted;
+  renderShell(`
+    <div class="topbar">
+      <div class="page-title">
+        <h1>告警详情</h1>
+        <p>${escapeHtml(alert.title)}</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="secondary" id="alertBackBtn">返回告警列表</button>
+      </div>
+    </div>
+    <section class="grid two">
+      <div class="panel">
+        <h2>告警信息</h2>
+        <article class="list-item">
+          <strong>${escapeHtml(alert.title)}</strong>
+          <span>${escapeHtml(alert.detail)}</span>
+          <div class="meta">
+            <span class="tag ${alert.level}">${LEVEL_LABEL[alert.level] || alert.level}</span>
+            <span class="tag ${alert.status}">${STATUS_LABEL[alert.status] || alert.status}</span>
+            <span>发生时间：${formatDate(alert.createdAt)}</span>
+            ${alert.handledByName ? `<span>当前处理人：${escapeHtml(alert.handledByName)}</span>` : ""}
+            ${alert.handledAt ? `<span>最近处理：${formatDate(alert.handledAt)}</span>` : ""}
+            ${alert.resolvedAt ? `<span>处理完成：${formatDate(alert.resolvedAt)}</span>` : ""}
+          </div>
+        </article>
+        ${renderAcceptanceInfo(alert)}
+        ${
+          canHandle
+            ? `<form class="alert-form" id="alertHandleForm">
+                <label>处理状态
+                  <select name="status">
+                    ${statusOptions
+                      .map((s) => `<option value="${s}" ${s === alert.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`)
+                      .join("")}
+                  </select>
+                </label>
+                <label>处理说明
+                  <textarea name="note" rows="4" placeholder="请填写本次处理说明，例如已联系住户、上门检修情况、闭环结论等" required></textarea>
+                </label>
+                <button type="submit">提交处理记录</button>
+                <div class="notice" id="alertHandleNotice"></div>
+              </form>`
+            : ""
+        }
+        ${
+          isResident
+            ? `<div class="notice info">您作为家庭用户仅可查看本家庭告警处理进展，不能修改处理记录。</div>`
+            : ""
+        }
+        ${
+          canObject
+            ? `<form class="alert-form" id="alertObjectionForm">
+                <label>异议说明
+                  <textarea name="note" rows="4" placeholder="如对处理结果有异议，请在此说明具体原因，运维人员将重新跟进处理" required></textarea>
+                </label>
+                <button type="submit" class="danger">提交异议</button>
+                <div class="notice" id="alertObjectionNotice"></div>
+              </form>`
+            : ""
+        }
+      </div>
+      <div class="panel">
+        <h2>处理记录历史</h2>
+        <div class="timeline">
+          ${
+            history.length
+              ? history
+                  .map(
+                    (entry) => `
+                    <div class="timeline-item ${entry.type === "objection" ? "objection" : ""}">
+                      <div class="timeline-dot"></div>
+                      <div class="timeline-content">
+                        <div class="meta">
+                          <span class="tag ${entry.type}">${HISTORY_TYPE_LABEL[entry.type] || entry.type}</span>
+                          <span class="tag ${entry.status}">${STATUS_LABEL[entry.status] || entry.status}</span>
+                          <span>${entry.handledByName ? `提交人：${escapeHtml(entry.handledByName)}` : "系统自动"}</span>
+                          <span>${formatDate(entry.handledAt)}</span>
+                        </div>
+                        <p>${escapeHtml(entry.note)}</p>
+                      </div>
+                    </div>
+                  `
+                  )
+                  .join("")
+              : "<div class='list-item'>暂无处理记录，等待运维人员跟进。</div>"
+          }
+        </div>
+      </div>
+    </section>
+  `);
+  qs("#alertBackBtn").addEventListener("click", () => {
+    state.selectedAlertId = null;
+    state.selectedAlert = null;
+    state.view = "alerts";
+    renderApp();
+  });
+  const form = qs("#alertHandleForm");
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(form));
+      const notice = qs("#alertHandleNotice");
+      try {
+        await api(`/api/alerts/${alert.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        await loadAlertDetail(alert.id);
+        renderAlertDetail();
+      } catch (error) {
+        if (notice) notice.textContent = error.message;
+      }
+    });
+  }
+  const objectionForm = qs("#alertObjectionForm");
+  if (objectionForm) {
+    objectionForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(event.currentTarget));
+      const notice = qs("#alertObjectionNotice");
+      try {
+        await api(`/api/alerts/${alert.id}/objections`, { method: "POST", body: JSON.stringify(payload) });
+        await loadAlertDetail(alert.id);
+        renderAlertDetail();
+      } catch (error) {
+        if (notice) notice.textContent = error.message;
+      }
+    });
+  }
 }
 
 function renderPlans() {
@@ -480,6 +702,7 @@ async function renderUsers() {
 function renderApp() {
   if (state.view === "homes") return renderHomes();
   if (state.view === "alerts") return renderAlerts();
+  if (state.view === "alertDetail") return renderAlertDetail();
   if (state.view === "plans") return renderPlans();
   if (state.view === "users" && state.user.role === "admin") return renderUsers();
   renderDashboard();

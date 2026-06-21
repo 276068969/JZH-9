@@ -306,6 +306,31 @@ select {
   color: var(--ok);
 }
 
+.tag.processing {
+  background: #f6ead9;
+  color: var(--warn);
+}
+
+.tag.resolved {
+  background: #dff0e7;
+  color: var(--ok);
+}
+
+.tag.disputed {
+  background: #fae5e7;
+  color: var(--bad);
+}
+
+.tag.handle {
+  background: #e3edf3;
+  color: var(--brand-dark);
+}
+
+.tag.objection {
+  background: #fae5e7;
+  color: var(--bad);
+}
+
 .table-wrap {
   overflow: auto;
 }
@@ -339,6 +364,117 @@ th {
 .notice {
   min-height: 22px;
   color: var(--bad);
+}
+
+.notice.info {
+  min-height: auto;
+  color: var(--brand-dark);
+  background: #e3edf3;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.notice.success {
+  min-height: auto;
+  color: var(--ok);
+  background: #dff0e7;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.notice.warning {
+  min-height: auto;
+  color: var(--warn);
+  background: #f6ead9;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.alert-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.alert-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.alert-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: 92px;
+  padding: 10px;
+  background: #fff;
+  font: inherit;
+  resize: vertical;
+}
+
+.timeline {
+  display: grid;
+  gap: 0;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+  padding-bottom: 18px;
+  position: relative;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--brand);
+  margin-top: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-item.objection .timeline-dot {
+  background: var(--bad);
+}
+
+.timeline-item.objection .timeline-content {
+  background: #fef5f6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid #f3d3d7;
+}
+
+.timeline-content {
+  display: grid;
+  gap: 6px;
+}
+
+.timeline-content p {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--ink);
 }
 
 .actions {

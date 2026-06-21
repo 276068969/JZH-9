@@ -8,7 +8,7 @@
 - 角色权限控制：内置 `admin`、`operator`、`resident` 三类角色，接口按角色隔离。
 - 智能用水分析：按家庭汇总月度用水、近 14 日趋势、配额占比、压力均值和漏损风险。
 - 远程阀门控制：运维或管理员可下发开阀、关阀命令，并保留指令记录。
-- 告警闭环：支持漏水、压力异常等告警查看与状态流转。
+- 告警闭环：支持漏水、压力异常等告警查看、处理说明填写与状态流转历史追踪，处理记录按家庭隔离。
 - 节水计划：可设置家庭月度配额、提醒阈值与自动关阀策略。
 - 无外部运行依赖：后端仅使用 Node.js 内置模块，数据落在 `data/store.json`，便于教学、演示和容器部署。
 
@@ -84,7 +84,8 @@ docker compose down
 | PATCH | `/api/users/:id` | 修改用户，管理员可用 |
 | GET | `/api/homes` | 家庭列表 |
 | GET | `/api/alerts` | 告警列表 |
-| PATCH | `/api/alerts/:id` | 更新告警状态 |
+| GET | `/api/alerts/:id` | 告警详情与处理历史 |
+| PATCH | `/api/alerts/:id` | 处理告警（需提交处理说明） |
 | POST | `/api/commands` | 下发阀门控制指令 |
 | POST | `/api/plans` | 新增或更新节水计划 |
 | GET | `/api/reports/:homeId` | 家庭用水报表 |

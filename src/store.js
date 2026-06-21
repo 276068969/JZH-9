@@ -4,6 +4,11 @@ const crypto = require("crypto");
 
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "store.json");
 
+const ALERT_STATUSES = ["open", "processing", "resolved", "disputed"];
+const HISTORY_TYPES = ["handle", "objection"];
+const ACCEPTANCE_TYPES = ["default", "manual", "none"];
+const DEFAULT_ACCEPTANCE_DAYS = 14;
+
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
   const hash = crypto.pbkdf2Sync(password, salt, 120000, 32, "sha256").toString("hex");
   return `${salt}:${hash}`;
@@ -155,7 +160,16 @@ function seedData() {
         title: "疑似连续微漏",
         detail: "夜间低流量持续 4 小时，建议检查马桶水箱与厨房接口。",
         status: "open",
-        createdAt: todayOffset(-1)
+        createdAt: todayOffset(-1),
+        handledBy: null,
+        handledAt: null,
+        resolvedAt: null,
+        acceptance: {
+          accepted: false,
+          acceptedAt: null,
+          acceptanceType: "none"
+        },
+        history: []
       },
       {
         id: "alt_pressure_202",
@@ -165,7 +179,25 @@ function seedData() {
         title: "压力偏低",
         detail: "过去 24 小时平均压力低于家庭设定阈值。",
         status: "processing",
-        createdAt: todayOffset(-3)
+        createdAt: todayOffset(-3),
+        handledBy: "usr_operator",
+        handledAt: todayOffset(-2),
+        resolvedAt: null,
+        acceptance: {
+          accepted: false,
+          acceptedAt: null,
+          acceptanceType: "none"
+        },
+        history: [
+          {
+            id: "his_seed_pressure_1",
+            type: "handle",
+            status: "processing",
+            note: "已通知住户观察压力变化，并安排明天上门检查入户阀门与过滤网。",
+            handledBy: "usr_operator",
+            handledAt: todayOffset(-2)
+          }
+        ]
       }
     ],
     plans: [
@@ -213,6 +245,54 @@ function runMigrations(data, store) {
     data.settings.migrationVersion = 1;
     if (!data.settings.initialized) data.settings.initialized = true;
     logs.push(`[MIGRATION] 版本 1 完成：共 ${beforeCount} 个设备，补全 ${migrated} 个 token`);
+    dirty = true;
+  }
+
+  if (currentVersion < 2) {
+    logs.push(`[MIGRATION] 执行版本 2：为告警补全处理历史 history 字段`);
+    let backfilled = 0;
+    (data.alerts || []).forEach((alert) => {
+      if (!Array.isArray(alert.history)) {
+        alert.history = [];
+        backfilled += 1;
+      }
+      if (alert.handledBy === undefined) alert.handledBy = null;
+      if (alert.handledAt === undefined) alert.handledAt = null;
+    });
+    if (!data.settings) data.settings = {};
+    data.settings.migrationVersion = 2;
+    logs.push(`[MIGRATION] 版本 2 完成：补全 ${backfilled} 个告警的 history`);
+    dirty = true;
+  }
+
+  if (currentVersion < 3) {
+    logs.push(`[MIGRATION] 执行版本 3：为告警补全异议、解决时间、接受状态与历史类型字段`);
+    let backfilled = 0;
+    (data.alerts || []).forEach((alert) => {
+      if (alert.resolvedAt === undefined) alert.resolvedAt = null;
+      if (!alert.acceptance || typeof alert.acceptance !== "object") {
+        alert.acceptance = {
+          accepted: false,
+          acceptedAt: null,
+          acceptanceType: "none"
+        };
+      } else {
+        if (alert.acceptance.accepted === undefined) alert.acceptance.accepted = false;
+        if (alert.acceptance.acceptedAt === undefined) alert.acceptance.acceptedAt = null;
+        if (!ACCEPTANCE_TYPES.includes(alert.acceptance.acceptanceType)) {
+          alert.acceptance.acceptanceType = "none";
+        }
+      }
+      (alert.history || []).forEach((entry) => {
+        if (!entry.type || !HISTORY_TYPES.includes(entry.type)) {
+          entry.type = "handle";
+        }
+      });
+      backfilled += 1;
+    });
+    if (!data.settings) data.settings = {};
+    data.settings.migrationVersion = 3;
+    logs.push(`[MIGRATION] 版本 3 完成：补全 ${backfilled} 个告警的闭环追踪字段`);
     dirty = true;
   }
 
@@ -342,6 +422,151 @@ class Store {
     }
     this.write();
     return plan;
+  }
+
+  getAlert(alertId) {
+    return this.data.alerts.find((item) => item.id === alertId) || null;
+  }
+
+  handleAlert(alertId, input, actor) {
+    const alert = this.data.alerts.find((item) => item.id === alertId);
+    if (!alert) return null;
+    const note = String(input.note || "").trim();
+    if (!note) {
+      const error = new Error("请填写处理说明");
+      error.status = 400;
+      throw error;
+    }
+    const status = input.status ? String(input.status) : alert.status;
+    if (!ALERT_STATUSES.includes(status)) {
+      const error = new Error("告警状态无效");
+      error.status = 400;
+      throw error;
+    }
+    const now = new Date().toISOString();
+    alert.status = status;
+    alert.handledBy = actor.id;
+    alert.handledAt = now;
+    if (status === "resolved") {
+      alert.resolvedAt = now;
+    }
+    if (!Array.isArray(alert.history)) alert.history = [];
+    alert.history.push({
+      id: randomId("his"),
+      type: "handle",
+      status,
+      note,
+      handledBy: actor.id,
+      handledAt: now
+    });
+    this.write();
+    return alert;
+  }
+
+  addObjection(alertId, input, actor) {
+    const alert = this.data.alerts.find((item) => item.id === alertId);
+    if (!alert) return null;
+    const note = String(input.note || "").trim();
+    if (!note) {
+      const error = new Error("请填写异议说明");
+      error.status = 400;
+      throw error;
+    }
+    if (!alert.acceptance) {
+      alert.acceptance = { accepted: false, acceptedAt: null, acceptanceType: "none" };
+    }
+    if (alert.acceptance.accepted) {
+      const error = new Error("告警已确认接受，无法再提出异议");
+      error.status = 409;
+      throw error;
+    }
+    const now = new Date().toISOString();
+    alert.status = "disputed";
+    if (!Array.isArray(alert.history)) alert.history = [];
+    alert.history.push({
+      id: randomId("his"),
+      type: "objection",
+      status: "disputed",
+      note,
+      handledBy: actor.id,
+      handledAt: now
+    });
+    this.write();
+    return alert;
+  }
+
+  computeAcceptance(alert) {
+    if (!alert) return { accepted: false, acceptedAt: null, acceptanceType: "none", daysUntilAccept: null };
+    const acceptance = alert.acceptance || { accepted: false, acceptedAt: null, acceptanceType: "none" };
+    if (acceptance.accepted) {
+      return { ...acceptance, daysUntilAccept: 0 };
+    }
+    if (!alert.resolvedAt) {
+      return { ...acceptance, daysUntilAccept: null };
+    }
+    const resolvedDate = new Date(alert.resolvedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - resolvedDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    const daysUntilAccept = Math.max(0, DEFAULT_ACCEPTANCE_DAYS - diffDays);
+    if (diffDays >= DEFAULT_ACCEPTANCE_DAYS) {
+      acceptance.accepted = true;
+      acceptance.acceptedAt = new Date(resolvedDate.getTime() + DEFAULT_ACCEPTANCE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      acceptance.acceptanceType = "default";
+      alert.acceptance = acceptance;
+      if (!Array.isArray(alert.history)) alert.history = [];
+      alert.history.push({
+        id: randomId("his"),
+        type: "handle",
+        status: alert.status,
+        note: `告警处理完成已超过 ${DEFAULT_ACCEPTANCE_DAYS} 天，系统默认接受处理结果。`,
+        handledBy: null,
+        handledAt: acceptance.acceptedAt
+      });
+      this.write();
+      return { ...acceptance, daysUntilAccept: 0 };
+    }
+    return { ...acceptance, daysUntilAccept: Math.ceil(daysUntilAccept) };
+  }
+
+  publicAlert(alert, { withHistory = true } = {}) {
+    if (!alert) return null;
+    const userName = (id) =>
+      id ? (this.data.users.find((item) => item.id === id)?.name || "未知用户") : null;
+    const acceptance = this.computeAcceptance(alert);
+    const base = {
+      id: alert.id,
+      homeId: alert.homeId,
+      level: alert.level,
+      type: alert.type,
+      title: alert.title,
+      detail: alert.detail,
+      status: alert.status,
+      createdAt: alert.createdAt,
+      handledBy: alert.handledBy || null,
+      handledAt: alert.handledAt || null,
+      handledByName: userName(alert.handledBy),
+      resolvedAt: alert.resolvedAt || null,
+      acceptance: {
+        accepted: acceptance.accepted,
+        acceptedAt: acceptance.acceptedAt,
+        acceptanceType: acceptance.acceptanceType,
+        daysUntilAccept: acceptance.daysUntilAccept,
+        defaultAcceptanceDays: DEFAULT_ACCEPTANCE_DAYS
+      }
+    };
+    if (withHistory) {
+      base.history = (alert.history || []).map((entry) => ({
+        id: entry.id,
+        type: entry.type || "handle",
+        status: entry.status,
+        note: entry.note,
+        handledBy: entry.handledBy,
+        handledAt: entry.handledAt,
+        handledByName: userName(entry.handledBy)
+      }));
+    }
+    return base;
   }
 
   findDeviceByToken(token) {

@@ -635,8 +635,26 @@
       "type": "leak",
       "title": "疑似连续微漏",
       "detail": "夜间低流量持续 4 小时，建议检查马桶水箱与厨房接口。",
-      "status": "open",
-      "createdAt": "2026-06-17T13:48:48.153Z"
+      "status": "resolved",
+      "createdAt": "2026-06-17T13:48:48.153Z",
+      "history": [
+        {
+          "id": "his_6b96e2be92",
+          "status": "processing",
+          "note": "已联系住户预约明天上午上门检查马桶水箱与厨房接口。",
+          "handledBy": "usr_admin",
+          "handledAt": "2026-06-21T09:48:37.137Z"
+        },
+        {
+          "id": "his_b12ada83b8",
+          "status": "resolved",
+          "note": "上门检查确认马桶水箱密封圈老化，已更换新密封圈并复测30分钟无渗漏，闭环处理。",
+          "handledBy": "usr_admin",
+          "handledAt": "2026-06-21T10:21:17.547Z"
+        }
+      ],
+      "handledBy": "usr_admin",
+      "handledAt": "2026-06-21T10:21:17.547Z"
     },
     {
       "id": "alt_pressure_202",
@@ -646,7 +664,10 @@
       "title": "压力偏低",
       "detail": "过去 24 小时平均压力低于家庭设定阈值。",
       "status": "processing",
-      "createdAt": "2026-06-15T13:48:48.153Z"
+      "createdAt": "2026-06-15T13:48:48.153Z",
+      "history": [],
+      "handledBy": null,
+      "handledAt": null
     }
   ],
   "plans": [
@@ -663,7 +684,7 @@
   "commands": [],
   "settings": {
     "initialized": true,
-    "migrationVersion": 1
+    "migrationVersion": 2
   },
   "_migrations": [
     {
@@ -676,6 +697,15 @@
         "[MIGRATION]   - 设备 dev_valve_101 (101 入户阀门) 已生成 token",
         "[MIGRATION]   - 设备 dev_meter_202 (202 智能水表) 已生成 token",
         "[MIGRATION] 版本 1 完成：共 3 个设备，补全 3 个 token"
+      ]
+    },
+    {
+      "at": "2026-06-21T09:46:30.759Z",
+      "from": 1,
+      "to": 2,
+      "logs": [
+        "[MIGRATION] 执行版本 2：为告警补全处理历史 history 字段",
+        "[MIGRATION] 版本 2 完成：补全 2 个告警的 history"
       ]
     }
   ]
