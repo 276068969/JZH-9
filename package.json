@@ -1,0 +1,22 @@
+{
+  "name": "home-water-governance",
+  "version": "1.0.0",
+  "description": "家庭用水管控平台，全栈 Web 应用，包含前后台与 Docker 部署。",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "NODE_ENV=development node src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "water",
+    "iot",
+    "dashboard",
+    "rbac"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

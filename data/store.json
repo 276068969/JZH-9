@@ -1,0 +1,664 @@
+{
+  "users": [
+    {
+      "id": "usr_admin",
+      "name": "系统管理员",
+      "account": "admin",
+      "role": "admin",
+      "phone": "13800000001",
+      "status": "active",
+      "passwordHash": "b56a39b3c1f0baf7216a2c98fd518eb0:82156a59c6ef58c6b704a134177d6ba1749fda4c7e74c7a95f52f8bc7f889e8b"
+    },
+    {
+      "id": "usr_operator",
+      "name": "运维值班员",
+      "account": "operator",
+      "role": "operator",
+      "phone": "13800000002",
+      "status": "active",
+      "passwordHash": "46a0a2226a2e09bb0259df4e13e9e810:d61d062e6f5024f91390988dd172c57edd1bed5ad8a234e90bb539a939d66ffc"
+    },
+    {
+      "id": "usr_resident",
+      "name": "家庭成员",
+      "account": "resident",
+      "role": "resident",
+      "phone": "13800000003",
+      "status": "active",
+      "passwordHash": "8833368e91ccde7d7c7705ad3d069248:5dfa09fe9f52399070d2775baeeea84487094324bc8fa2e3a192f21f19071c7c"
+    }
+  ],
+  "homes": [
+    {
+      "id": "home_101",
+      "name": "晴川小区 3-101",
+      "ownerId": "usr_resident",
+      "address": "晴川小区 3 栋 101",
+      "memberCount": 4,
+      "monthlyQuota": 18,
+      "pressureMin": 0.18,
+      "pressureMax": 0.42
+    },
+    {
+      "id": "home_202",
+      "name": "云岸花园 8-202",
+      "ownerId": "usr_operator",
+      "address": "云岸花园 8 栋 202",
+      "memberCount": 2,
+      "monthlyQuota": 12,
+      "pressureMin": 0.16,
+      "pressureMax": 0.4
+    }
+  ],
+  "devices": [
+    {
+      "id": "dev_meter_101",
+      "homeId": "home_101",
+      "name": "101 智能水表",
+      "type": "meter",
+      "status": "online",
+      "valve": "open",
+      "battery": 86,
+      "installedAt": "2025-09-01"
+    },
+    {
+      "id": "dev_valve_101",
+      "homeId": "home_101",
+      "name": "101 入户阀门",
+      "type": "valve",
+      "status": "online",
+      "valve": "open",
+      "battery": 79,
+      "installedAt": "2025-09-01"
+    },
+    {
+      "id": "dev_meter_202",
+      "homeId": "home_202",
+      "name": "202 智能水表",
+      "type": "meter",
+      "status": "online",
+      "valve": "open",
+      "battery": 67,
+      "installedAt": "2025-11-15"
+    }
+  ],
+  "readings": [
+    {
+      "id": "rd_c501c2f3d5",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-20T13:48:48.152Z",
+      "usage": 0.6,
+      "pressure": 0.24,
+      "temperature": 16.5
+    },
+    {
+      "id": "rd_ff8b853eb8",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-20T13:48:48.152Z",
+      "usage": 0.33,
+      "pressure": 0.21,
+      "temperature": 17.9
+    },
+    {
+      "id": "rd_e233412071",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-21T13:48:48.152Z",
+      "usage": 0.54,
+      "pressure": 0.24,
+      "temperature": 16.1
+    },
+    {
+      "id": "rd_09d95023b9",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-21T13:48:48.152Z",
+      "usage": 0.32,
+      "pressure": 0.21,
+      "temperature": 16.6
+    },
+    {
+      "id": "rd_0cf7480c06",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-22T13:48:48.152Z",
+      "usage": 0.5,
+      "pressure": 0.25,
+      "temperature": 17.4
+    },
+    {
+      "id": "rd_64fe111c96",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-22T13:48:48.152Z",
+      "usage": 0.35,
+      "pressure": 0.21,
+      "temperature": 15.7
+    },
+    {
+      "id": "rd_fdebff4225",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-23T13:48:48.152Z",
+      "usage": 0.67,
+      "pressure": 0.26,
+      "temperature": 19.3
+    },
+    {
+      "id": "rd_7af1ecc1e2",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-23T13:48:48.152Z",
+      "usage": 0.51,
+      "pressure": 0.22,
+      "temperature": 15.9
+    },
+    {
+      "id": "rd_b31dda7d63",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-24T13:48:48.152Z",
+      "usage": 0.73,
+      "pressure": 0.28,
+      "temperature": 20
+    },
+    {
+      "id": "rd_5b740026e5",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-24T13:48:48.152Z",
+      "usage": 0.52,
+      "pressure": 0.23,
+      "temperature": 17.2
+    },
+    {
+      "id": "rd_30d481a423",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-25T13:48:48.152Z",
+      "usage": 0.61,
+      "pressure": 0.3,
+      "temperature": 18.8
+    },
+    {
+      "id": "rd_c51ae18839",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-25T13:48:48.152Z",
+      "usage": 0.38,
+      "pressure": 0.24,
+      "temperature": 18.3
+    },
+    {
+      "id": "rd_b55a5a603d",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-26T13:48:48.152Z",
+      "usage": 0.61,
+      "pressure": 0.32,
+      "temperature": 16.9
+    },
+    {
+      "id": "rd_ae320836c9",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-26T13:48:48.152Z",
+      "usage": 0.34,
+      "pressure": 0.25,
+      "temperature": 18.2
+    },
+    {
+      "id": "rd_8090fca744",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-27T13:48:48.152Z",
+      "usage": 0.56,
+      "pressure": 0.32,
+      "temperature": 16
+    },
+    {
+      "id": "rd_981fb41c35",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-27T13:48:48.152Z",
+      "usage": 0.32,
+      "pressure": 0.25,
+      "temperature": 17
+    },
+    {
+      "id": "rd_f69bc817f0",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-28T13:48:48.152Z",
+      "usage": 0.51,
+      "pressure": 0.32,
+      "temperature": 16.9
+    },
+    {
+      "id": "rd_b00c9642bc",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-28T13:48:48.152Z",
+      "usage": 0.34,
+      "pressure": 0.26,
+      "temperature": 15.8
+    },
+    {
+      "id": "rd_128734127c",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-29T13:48:48.152Z",
+      "usage": 0.51,
+      "pressure": 0.3,
+      "temperature": 18.8
+    },
+    {
+      "id": "rd_e6ec24229b",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-29T13:48:48.152Z",
+      "usage": 0.38,
+      "pressure": 0.27,
+      "temperature": 15.7
+    },
+    {
+      "id": "rd_261146aa68",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-30T13:48:48.152Z",
+      "usage": 0.71,
+      "pressure": 0.28,
+      "temperature": 20
+    },
+    {
+      "id": "rd_079f6ca28a",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-30T13:48:48.152Z",
+      "usage": 0.52,
+      "pressure": 0.27,
+      "temperature": 16.8
+    },
+    {
+      "id": "rd_c7b9c566ce",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-05-31T13:48:48.152Z",
+      "usage": 0.77,
+      "pressure": 0.26,
+      "temperature": 19.3
+    },
+    {
+      "id": "rd_21c1c01b6e",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-05-31T13:48:48.152Z",
+      "usage": 0.51,
+      "pressure": 0.27,
+      "temperature": 18.1
+    },
+    {
+      "id": "rd_b4a73e4304",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-01T13:48:48.152Z",
+      "usage": 0.62,
+      "pressure": 0.25,
+      "temperature": 17.4
+    },
+    {
+      "id": "rd_19012ede96",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-01T13:48:48.152Z",
+      "usage": 0.35,
+      "pressure": 0.26,
+      "temperature": 18.3
+    },
+    {
+      "id": "rd_fcf3f8803b",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-02T13:48:48.152Z",
+      "usage": 0.58,
+      "pressure": 0.24,
+      "temperature": 16.1
+    },
+    {
+      "id": "rd_0e90e8ce1b",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-02T13:48:48.152Z",
+      "usage": 0.32,
+      "pressure": 0.26,
+      "temperature": 17.4
+    },
+    {
+      "id": "rd_dc71a6b465",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-03T13:48:48.152Z",
+      "usage": 0.52,
+      "pressure": 0.24,
+      "temperature": 16.5
+    },
+    {
+      "id": "rd_57bbb0897b",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-03T13:48:48.152Z",
+      "usage": 0.33,
+      "pressure": 0.25,
+      "temperature": 16.1
+    },
+    {
+      "id": "rd_d312eed8bd",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-04T13:48:48.152Z",
+      "usage": 0.5,
+      "pressure": 0.25,
+      "temperature": 18.3
+    },
+    {
+      "id": "rd_7a64364b6b",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-04T13:48:48.152Z",
+      "usage": 0.37,
+      "pressure": 0.24,
+      "temperature": 15.6
+    },
+    {
+      "id": "rd_abad8ff7c1",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-05T13:48:48.152Z",
+      "usage": 0.53,
+      "pressure": 0.27,
+      "temperature": 19.8
+    },
+    {
+      "id": "rd_7c1845f7e8",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-05T13:48:48.152Z",
+      "usage": 0.4,
+      "pressure": 0.23,
+      "temperature": 16.4
+    },
+    {
+      "id": "rd_ea7b831516",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-06T13:48:48.152Z",
+      "usage": 0.75,
+      "pressure": 0.29,
+      "temperature": 19.7
+    },
+    {
+      "id": "rd_6372307f0c",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-06T13:48:48.152Z",
+      "usage": 0.51,
+      "pressure": 0.22,
+      "temperature": 17.8
+    },
+    {
+      "id": "rd_e3416f611d",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-07T13:48:48.152Z",
+      "usage": 0.78,
+      "pressure": 0.31,
+      "temperature": 18
+    },
+    {
+      "id": "rd_bfb14c55d5",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-07T13:48:48.152Z",
+      "usage": 0.48,
+      "pressure": 0.21,
+      "temperature": 18.4
+    },
+    {
+      "id": "rd_09efb9fa48",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-08T13:48:48.152Z",
+      "usage": 0.59,
+      "pressure": 0.32,
+      "temperature": 16.3
+    },
+    {
+      "id": "rd_c7dab848d8",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-08T13:48:48.153Z",
+      "usage": 0.33,
+      "pressure": 0.21,
+      "temperature": 17.8
+    },
+    {
+      "id": "rd_b38e57d30f",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-09T13:48:48.153Z",
+      "usage": 0.54,
+      "pressure": 0.32,
+      "temperature": 16.2
+    },
+    {
+      "id": "rd_48455a4f19",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-09T13:48:48.153Z",
+      "usage": 0.32,
+      "pressure": 0.21,
+      "temperature": 16.4
+    },
+    {
+      "id": "rd_7e74287134",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-10T13:48:48.153Z",
+      "usage": 0.5,
+      "pressure": 0.31,
+      "temperature": 17.7
+    },
+    {
+      "id": "rd_5cae085bd4",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-10T13:48:48.153Z",
+      "usage": 0.35,
+      "pressure": 0.21,
+      "temperature": 15.6
+    },
+    {
+      "id": "rd_349013e6d5",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-11T13:48:48.153Z",
+      "usage": 0.52,
+      "pressure": 0.29,
+      "temperature": 19.5
+    },
+    {
+      "id": "rd_c3003e638a",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-11T13:48:48.153Z",
+      "usage": 0.39,
+      "pressure": 0.22,
+      "temperature": 16.1
+    },
+    {
+      "id": "rd_cbc0a1281c",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-12T13:48:48.153Z",
+      "usage": 0.58,
+      "pressure": 0.27,
+      "temperature": 19.9
+    },
+    {
+      "id": "rd_4423a99b80",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-12T13:48:48.153Z",
+      "usage": 0.4,
+      "pressure": 0.23,
+      "temperature": 17.4
+    },
+    {
+      "id": "rd_561b597df5",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-13T13:48:48.153Z",
+      "usage": 0.78,
+      "pressure": 0.26,
+      "temperature": 18.6
+    },
+    {
+      "id": "rd_39eec5f021",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-13T13:48:48.153Z",
+      "usage": 0.49,
+      "pressure": 0.24,
+      "temperature": 18.3
+    },
+    {
+      "id": "rd_69d61a4cc1",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-14T13:48:48.153Z",
+      "usage": 0.77,
+      "pressure": 0.24,
+      "temperature": 16.7
+    },
+    {
+      "id": "rd_7dbb91f268",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-14T13:48:48.153Z",
+      "usage": 0.45,
+      "pressure": 0.25,
+      "temperature": 18.1
+    },
+    {
+      "id": "rd_5d971a9b71",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-15T13:48:48.153Z",
+      "usage": 0.55,
+      "pressure": 0.24,
+      "temperature": 16
+    },
+    {
+      "id": "rd_56282d4713",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-15T13:48:48.153Z",
+      "usage": 0.32,
+      "pressure": 0.26,
+      "temperature": 16.8
+    },
+    {
+      "id": "rd_cc12e7efa3",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-16T13:48:48.153Z",
+      "usage": 1.41,
+      "pressure": 0.25,
+      "temperature": 17.2
+    },
+    {
+      "id": "rd_7d94fd9fe4",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-16T13:48:48.153Z",
+      "usage": 0.34,
+      "pressure": 0.26,
+      "temperature": 15.7
+    },
+    {
+      "id": "rd_d03aff52e8",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-17T13:48:48.153Z",
+      "usage": 0.51,
+      "pressure": 0.26,
+      "temperature": 19.1
+    },
+    {
+      "id": "rd_15fa6843c8",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-17T13:48:48.153Z",
+      "usage": 0.38,
+      "pressure": 0.27,
+      "temperature": 15.8
+    },
+    {
+      "id": "rd_334017303e",
+      "homeId": "home_101",
+      "deviceId": "dev_meter_101",
+      "at": "2026-06-18T13:48:48.153Z",
+      "usage": 0.56,
+      "pressure": 0.28,
+      "temperature": 20
+    },
+    {
+      "id": "rd_916d35b670",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "at": "2026-06-18T13:48:48.153Z",
+      "usage": 0.4,
+      "pressure": 0.27,
+      "temperature": 17
+    }
+  ],
+  "alerts": [
+    {
+      "id": "alt_leak_101",
+      "homeId": "home_101",
+      "level": "high",
+      "type": "leak",
+      "title": "疑似连续微漏",
+      "detail": "夜间低流量持续 4 小时，建议检查马桶水箱与厨房接口。",
+      "status": "open",
+      "createdAt": "2026-06-17T13:48:48.153Z"
+    },
+    {
+      "id": "alt_pressure_202",
+      "homeId": "home_202",
+      "level": "medium",
+      "type": "pressure",
+      "title": "压力偏低",
+      "detail": "过去 24 小时平均压力低于家庭设定阈值。",
+      "status": "processing",
+      "createdAt": "2026-06-15T13:48:48.153Z"
+    }
+  ],
+  "plans": [
+    {
+      "id": "plan_101",
+      "homeId": "home_101",
+      "name": "节水守护",
+      "quota": 18,
+      "autoValve": true,
+      "notifyAtPercent": 80,
+      "status": "enabled"
+    }
+  ],
+  "commands": [],
+  "settings": {
+    "initialized": true
+  }
+}

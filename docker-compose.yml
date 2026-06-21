@@ -1,0 +1,13 @@
+services:
+  water-platform:
+    build: .
+    container_name: home-water-governance
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_FILE: /app/data/store.json
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
