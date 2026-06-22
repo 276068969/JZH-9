@@ -657,7 +657,9 @@ test("migration fills token for legacy store without token", async (t) => {
 });
 
 test("GET /api/commands returns command list with proper data", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -686,7 +688,9 @@ test("GET /api/commands returns command list with proper data", async (t) => {
 });
 
 test("GET /api/commands supports filtering by homeIds, actions, and statuses", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -725,7 +729,9 @@ test("GET /api/commands supports filtering by homeIds, actions, and statuses", a
 });
 
 test("resident user can only see commands for their own home", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -753,7 +759,9 @@ test("resident user can only see commands for their own home", async (t) => {
 });
 
 test("resident user cannot POST commands (write restriction)", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -779,7 +787,9 @@ test("resident user cannot POST commands (write restriction)", async (t) => {
 });
 
 test("operator user can access control records and issue commands", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -811,7 +821,9 @@ test("operator user can access control records and issue commands", async (t) =>
 });
 
 test("POST /api/commands creates a command and appears in GET /api/commands", async (t) => {
-  const server = http.createServer(createApp());
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "water-test-"));
+  const store = new Store(path.join(dir, "store.json"));
+  const server = http.createServer(createApp({ store }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -847,4 +859,40 @@ test("POST /api/commands creates a command and appears in GET /api/commands", as
   assert.equal(newCmd.reason, "manual");
   assert.equal(newCmd.status, "issued");
   assert.equal(newCmd.actorName, "运维值班员");
+});
+
+test("public/app.js renderShell unconditionally renders 控制记录 nav entry", async () => {
+  const appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf-8");
+
+  const renderShellMatch = appJs.match(/function renderShell\([^)]*\)[\s\S]*?document\.querySelectorAll\("\[data-view\]"\)/);
+  assert.ok(renderShellMatch, "应找到 renderShell 函数");
+  const renderShellBody = renderShellMatch[0];
+
+  assert.ok(
+    renderShellBody.includes('${navButton("commands", "控制记录")}'),
+    "renderShell 应无条件包含控制记录导航按钮"
+  );
+
+  const roleGuardPattern = /commandNav|commands.*admin.*operator|commands.*operator.*admin/i;
+  assert.ok(
+    !roleGuardPattern.test(renderShellBody),
+    "控制记录导航不应带有 admin/operator 角色守卫变量"
+  );
+});
+
+test("public/app.js renderApp commands route has no role restriction", async () => {
+  const appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf-8");
+
+  const renderAppMatch = appJs.match(/function renderApp\(\)[\s\S]*?renderDashboard\(\);/);
+  assert.ok(renderAppMatch, "应找到 renderApp 函数");
+  const renderAppBody = renderAppMatch[0];
+
+  const commandsLineMatch = renderAppBody.match(/if\s*\(\s*state\.view\s*===\s*"commands"[^)]*\)\s*return\s+renderCommands\(\);/);
+  assert.ok(commandsLineMatch, "renderApp 中应存在 commands 路由并调用 renderCommands()");
+  const commandsLine = commandsLineMatch[0];
+
+  assert.ok(
+    !/includes|admin|operator|role/.test(commandsLine),
+    "commands 路由判断行不应带角色条件（includes/admin/operator/role）"
+  );
 });
