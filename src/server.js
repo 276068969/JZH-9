@@ -163,6 +163,21 @@ function createApp(options = {}) {
       return send(res, 200, { homes: store.data.homes.filter((home) => ids.includes(home.id)) });
     }
 
+    if (req.method === "POST" && url.pathname === "/api/homes") {
+      requireUser(req, ["admin"]);
+      const body = await parseBody(req);
+      return send(res, 201, { home: store.createHome(body) });
+    }
+
+    const homeMatch = url.pathname.match(/^\/api\/homes\/([^/]+)$/);
+    if (homeMatch && req.method === "PATCH") {
+      requireUser(req, ["admin"]);
+      const body = await parseBody(req);
+      const home = store.updateHome(homeMatch[1], body);
+      if (!home) return send(res, 404, { message: "家庭不存在" });
+      return send(res, 200, { home });
+    }
+
     if (req.method === "GET" && url.pathname === "/api/alerts") {
       const { user } = requireUser(req);
       const ids = visibleHomeIds(store.data, user);

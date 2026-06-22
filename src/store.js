@@ -460,6 +460,149 @@ class Store {
     return this.publicUser(user);
   }
 
+  createHome(input) {
+    const name = String(input.name || "").trim();
+    if (!name) {
+      const error = new Error("家庭名称不能为空");
+      error.status = 400;
+      throw error;
+    }
+    const ownerId = String(input.ownerId || "").trim();
+    if (!ownerId) {
+      const error = new Error("请指定家庭负责人");
+      error.status = 400;
+      throw error;
+    }
+    const owner = this.data.users.find((item) => item.id === ownerId);
+    if (!owner) {
+      const error = new Error("负责人用户不存在");
+      error.status = 400;
+      throw error;
+    }
+    const memberCount = Number(input.memberCount);
+    if (input.memberCount !== undefined && (isNaN(memberCount) || memberCount < 0 || memberCount > 100)) {
+      const error = new Error("成员数数值无效");
+      error.status = 400;
+      throw error;
+    }
+    const monthlyQuota = Number(input.monthlyQuota);
+    if (input.monthlyQuota !== undefined && (isNaN(monthlyQuota) || monthlyQuota < 0 || monthlyQuota > 10000)) {
+      const error = new Error("月配额数值无效");
+      error.status = 400;
+      throw error;
+    }
+    const pressureMin = Number(input.pressureMin);
+    if (input.pressureMin !== undefined && (isNaN(pressureMin) || pressureMin < 0 || pressureMin > 2)) {
+      const error = new Error("压力下限数值无效");
+      error.status = 400;
+      throw error;
+    }
+    const pressureMax = Number(input.pressureMax);
+    if (input.pressureMax !== undefined && (isNaN(pressureMax) || pressureMax < 0 || pressureMax > 2)) {
+      const error = new Error("压力上限数值无效");
+      error.status = 400;
+      throw error;
+    }
+    if (
+      input.pressureMin !== undefined &&
+      input.pressureMax !== undefined &&
+      pressureMin > pressureMax
+    ) {
+      const error = new Error("压力下限不能大于压力上限");
+      error.status = 400;
+      throw error;
+    }
+
+    const home = {
+      id: randomId("home"),
+      name,
+      ownerId,
+      address: String(input.address || "").trim(),
+      memberCount: input.memberCount !== undefined ? memberCount : 2,
+      monthlyQuota: input.monthlyQuota !== undefined ? monthlyQuota : 15,
+      pressureMin: input.pressureMin !== undefined ? pressureMin : 0.16,
+      pressureMax: input.pressureMax !== undefined ? pressureMax : 0.4
+    };
+    this.data.homes.push(home);
+    this.write();
+    return home;
+  }
+
+  updateHome(id, input) {
+    const home = this.data.homes.find((item) => item.id === id);
+    if (!home) return null;
+
+    if (input.name !== undefined) {
+      const name = String(input.name).trim();
+      if (!name) {
+        const error = new Error("家庭名称不能为空");
+        error.status = 400;
+        throw error;
+      }
+      home.name = name;
+    }
+    if (input.ownerId !== undefined) {
+      const ownerId = String(input.ownerId).trim();
+      if (!ownerId) {
+        const error = new Error("负责人不能为空");
+        error.status = 400;
+        throw error;
+      }
+      const owner = this.data.users.find((item) => item.id === ownerId);
+      if (!owner) {
+        const error = new Error("负责人用户不存在");
+        error.status = 400;
+        throw error;
+      }
+      home.ownerId = ownerId;
+    }
+    if (input.address !== undefined) {
+      home.address = String(input.address || "").trim();
+    }
+    if (input.memberCount !== undefined) {
+      const memberCount = Number(input.memberCount);
+      if (isNaN(memberCount) || memberCount < 0 || memberCount > 100) {
+        const error = new Error("成员数数值无效");
+        error.status = 400;
+        throw error;
+      }
+      home.memberCount = memberCount;
+    }
+    if (input.monthlyQuota !== undefined) {
+      const monthlyQuota = Number(input.monthlyQuota);
+      if (isNaN(monthlyQuota) || monthlyQuota < 0 || monthlyQuota > 10000) {
+        const error = new Error("月配额数值无效");
+        error.status = 400;
+        throw error;
+      }
+      home.monthlyQuota = monthlyQuota;
+    }
+    if (input.pressureMin !== undefined || input.pressureMax !== undefined) {
+      const nextMin = input.pressureMin !== undefined ? Number(input.pressureMin) : home.pressureMin;
+      const nextMax = input.pressureMax !== undefined ? Number(input.pressureMax) : home.pressureMax;
+      if (isNaN(nextMin) || nextMin < 0 || nextMin > 2) {
+        const error = new Error("压力下限数值无效");
+        error.status = 400;
+        throw error;
+      }
+      if (isNaN(nextMax) || nextMax < 0 || nextMax > 2) {
+        const error = new Error("压力上限数值无效");
+        error.status = 400;
+        throw error;
+      }
+      if (nextMin > nextMax) {
+        const error = new Error("压力下限不能大于压力上限");
+        error.status = 400;
+        throw error;
+      }
+      if (input.pressureMin !== undefined) home.pressureMin = nextMin;
+      if (input.pressureMax !== undefined) home.pressureMax = nextMax;
+    }
+
+    this.write();
+    return home;
+  }
+
   createCommand(input, actorId) {
     const command = {
       id: randomId("cmd"),

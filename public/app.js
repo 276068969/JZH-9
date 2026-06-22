@@ -11,7 +11,10 @@ const state = {
     homeIds: [],
     actions: [],
     statuses: []
-  }
+  },
+  allUsers: [],
+  editingHomeId: null,
+  homeFormNotice: ""
 };
 
 const ROLE_LABEL = {
@@ -156,7 +159,7 @@ function navButton(key, label) {
 }
 
 function renderShell(content) {
-  const adminNav = state.user.role === "admin" ? navButton("users", "用户管理") : "";
+  const adminNav = state.user.role === "admin" ? navButton("users", "用户管理") + navButton("homeManagement", "家庭管理") : "";
   qs("#app").innerHTML = `
     <section class="app-shell">
       <aside class="sidebar">
@@ -890,6 +893,159 @@ async function renderUsers() {
   });
 }
 
+async function renderHomeManagement() {
+  if (state.user.role !== "admin") {
+    state.view = "dashboard";
+    return renderApp();
+  }
+  const usersData = await api("/api/users").catch(() => ({ users: [] }));
+  state.allUsers = usersData.users || [];
+
+  const homes = state.dashboard?.homes || [];
+  const editingHome = state.editingHomeId
+    ? homes.find((h) => h.id === state.editingHomeId) || null
+    : null;
+  const isEditing = Boolean(editingHome);
+
+  const formTitle = isEditing ? "编辑家庭档案" : "新增家庭档案";
+  const submitLabel = isEditing ? "保存修改" : "创建家庭";
+  const defaultValues = editingHome || {
+    name: "",
+    ownerId: state.allUsers[0]?.id || "",
+    address: "",
+    memberCount: 2,
+    monthlyQuota: 15,
+    pressureMin: 0.16,
+    pressureMax: 0.4
+  };
+
+  const ownerName = (id) => state.allUsers.find((u) => u.id === id)?.name || "未指定";
+
+  renderShell(`
+    <div class="topbar">
+      <div class="page-title">
+        <h1>家庭管理</h1>
+        <p>创建、查看和维护家庭档案，包括名称、地址、负责人、成员数、月配额及压力阈值。</p>
+      </div>
+    </div>
+    <form class="panel form-grid" id="homeForm">
+      <h2 style="grid-column: 1 / -1; margin: 0 0 8px 0;">${formTitle}${isEditing ? ` · ${escapeHtml(editingHome.name)}` : ""}</h2>
+      <label>家庭名称<input name="name" required value="${escapeHtml(defaultValues.name)}" placeholder="如：晴川小区 3-101" /></label>
+      <label>负责人
+        <select name="ownerId" required>
+          <option value="">请选择负责人</option>
+          ${state.allUsers
+            .map(
+              (u) =>
+                `<option value="${u.id}" ${u.id === defaultValues.ownerId ? "selected" : ""}>${escapeHtml(u.name)}（${ROLE_LABEL[u.role] || u.role}）</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+      <label style="grid-column: 1 / -1;">详细地址<input name="address" value="${escapeHtml(defaultValues.address)}" placeholder="如：晴川小区 3 栋 101" /></label>
+      <label>成员人数<input name="memberCount" type="number" min="0" max="100" value="${defaultValues.memberCount}" /></label>
+      <label>月配额（m³）<input name="monthlyQuota" type="number" min="0" step="0.1" value="${defaultValues.monthlyQuota}" /></label>
+      <label>压力下限（MPa）<input name="pressureMin" type="number" min="0" max="2" step="0.01" value="${defaultValues.pressureMin}" /></label>
+      <label>压力上限（MPa）<input name="pressureMax" type="number" min="0" max="2" step="0.01" value="${defaultValues.pressureMax}" /></label>
+      <div style="display: flex; gap: 8px; align-items: center; grid-column: 1 / -1;">
+        <button type="submit">${submitLabel}</button>
+        ${isEditing ? `<button type="button" class="secondary" id="cancelEditBtn">取消编辑</button>` : ""}
+        <div class="notice" id="homeFormNotice">${escapeHtml(state.homeFormNotice)}</div>
+      </div>
+    </form>
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>家庭名称</th>
+            <th>地址</th>
+            <th>负责人</th>
+            <th>成员</th>
+            <th>月配额</th>
+            <th>压力区间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${homes
+            .map(
+              (home) => `
+              <tr>
+                <td><strong>${escapeHtml(home.name)}</strong></td>
+                <td>${escapeHtml(home.address || "-")}</td>
+                <td>${escapeHtml(ownerName(home.ownerId))}</td>
+                <td>${home.memberCount}</td>
+                <td>${home.monthlyQuota} m³</td>
+                <td>${home.pressureMin} ~ ${home.pressureMax} MPa</td>
+                <td class="actions">
+                  <button class="secondary" data-edit-home="${home.id}">编辑</button>
+                </td>
+              </tr>
+            `
+            )
+            .join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);">暂无家庭数据</td></tr>`}
+        </tbody>
+      </table>
+    </section>
+  `);
+
+  state.homeFormNotice = "";
+
+  const form = qs("#homeForm");
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const raw = Object.fromEntries(new FormData(form));
+      const payload = {
+        name: raw.name,
+        ownerId: raw.ownerId,
+        address: raw.address,
+        memberCount: Number(raw.memberCount),
+        monthlyQuota: Number(raw.monthlyQuota),
+        pressureMin: Number(raw.pressureMin),
+        pressureMax: Number(raw.pressureMax)
+      };
+      const notice = qs("#homeFormNotice");
+      try {
+        if (isEditing) {
+          await api(`/api/homes/${state.editingHomeId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await api("/api/homes", {
+            method: "POST",
+            body: JSON.stringify(payload)
+          });
+        }
+        state.editingHomeId = null;
+        await loadDashboard();
+        renderHomeManagement();
+      } catch (error) {
+        state.homeFormNotice = error.message;
+        if (notice) notice.textContent = error.message;
+      }
+    });
+  }
+
+  const cancelBtn = qs("#cancelEditBtn");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      state.editingHomeId = null;
+      state.homeFormNotice = "";
+      renderHomeManagement();
+    });
+  }
+
+  document.querySelectorAll("[data-edit-home]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.editingHomeId = button.dataset.editHome;
+      state.homeFormNotice = "";
+      renderHomeManagement();
+    });
+  });
+}
+
 function renderApp() {
   if (state.view === "homes") return renderHomes();
   if (state.view === "commands") return renderCommands();
@@ -897,6 +1053,7 @@ function renderApp() {
   if (state.view === "alertDetail") return renderAlertDetail();
   if (state.view === "plans") return renderPlans();
   if (state.view === "users" && state.user.role === "admin") return renderUsers();
+  if (state.view === "homeManagement" && state.user.role === "admin") return renderHomeManagement();
   renderDashboard();
 }
 
