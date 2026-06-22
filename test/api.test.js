@@ -592,7 +592,7 @@ test("migration backfills history array for legacy alerts", async (t) => {
   assert.ok(Array.isArray(alert.history), "迁移后告警应包含 history 数组");
   assert.equal(alert.handledBy, null);
   assert.ok(alert.acceptance, "迁移后告警应包含 acceptance 字段");
-  assert.equal(store.data.settings.migrationVersion, 3, "迁移版本号应更新为 3");
+  assert.equal(store.data.settings.migrationVersion, 4, "迁移版本号应更新为 4");
 });
 
 test("migration fills token for legacy store without token", async (t) => {
@@ -635,7 +635,7 @@ test("migration fills token for legacy store without token", async (t) => {
   const device = store.data.devices.find((d) => d.id === "dev_meter_test");
   assert.ok(device.token, "迁移后设备应已生成 token");
   assert.ok(device.token.length > 10, "token 长度应合理");
-  assert.equal(store.data.settings.migrationVersion, 3, "迁移版本号应更新为 3");
+  assert.equal(store.data.settings.migrationVersion, 4, "迁移版本号应更新为 4");
   assert.ok(store.data._migrations?.length > 0, "迁移历史应已记录");
 
   const server = http.createServer(createApp({ store }));
@@ -654,4 +654,137 @@ test("migration fills token for legacy store without token", async (t) => {
     })
   });
   assert.equal(result.status, 201, "迁移后的设备 token 应可正常认证");
+});
+
+test("GET /api/commands returns command list with proper data", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+
+  const result = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${login.body.token}` }
+  });
+
+  assert.equal(result.status, 200);
+  assert.ok(Array.isArray(result.body.commands), "应返回 commands 数组");
+  if (result.body.commands.length) {
+    const cmd = result.body.commands[0];
+    assert.ok(cmd.id, "指令应包含 id");
+    assert.ok(cmd.homeName, "指令应包含 homeName");
+    assert.ok(cmd.deviceName, "指令应包含 deviceName");
+    assert.ok(cmd.action, "指令应包含 action");
+    assert.ok(cmd.actorName, "指令应包含 actorName");
+    assert.ok(cmd.status, "指令应包含 status");
+    assert.ok(cmd.createdAt, "指令应包含 createdAt");
+  }
+});
+
+test("GET /api/commands supports filtering by homeIds, actions, and statuses", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+  const token = login.body.token;
+
+  const allResult = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const totalCount = allResult.body.commands.length;
+
+  const actionFiltered = await request(baseUrl, "/api/commands?actions=open_valve", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.ok(actionFiltered.body.commands.every((c) => c.action === "open_valve"), "按 action 筛选应生效");
+  assert.ok(actionFiltered.body.commands.length <= totalCount, "筛选后数量应不多于总数");
+
+  const statusFiltered = await request(baseUrl, "/api/commands?statuses=success", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.ok(statusFiltered.body.commands.every((c) => c.status === "success"), "按 status 筛选应生效");
+
+  const homeFiltered = await request(baseUrl, "/api/commands?homeIds=home_101", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.ok(homeFiltered.body.commands.every((c) => c.homeId === "home_101"), "按 homeId 筛选应生效");
+
+  const combinedFilter = await request(baseUrl, "/api/commands?actions=close_valve&statuses=success", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.ok(combinedFilter.body.commands.every((c) => c.action === "close_valve" && c.status === "success"), "多条件组合筛选应生效");
+});
+
+test("resident user can only see commands for their own home", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const adminLogin = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "admin", password: "Admin@123" })
+  });
+  const adminCommands = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${adminLogin.body.token}` }
+  });
+
+  const residentLogin = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "resident", password: "Home@123" })
+  });
+  const residentCommands = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${residentLogin.body.token}` }
+  });
+
+  assert.ok(residentCommands.body.commands.every((c) => c.homeId === "home_101"), "家庭用户只能查看所属家庭的指令");
+  assert.ok(residentCommands.body.commands.length <= adminCommands.body.commands.length, "家庭用户可见指令应不多于管理员");
+});
+
+test("POST /api/commands creates a command and appears in GET /api/commands", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "operator", password: "Ops@12345" })
+  });
+  const token = login.body.token;
+
+  const createResult = await request(baseUrl, "/api/commands", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      homeId: "home_101",
+      deviceId: "dev_valve_101",
+      action: "close_valve",
+      valve: "closed",
+      reason: "manual"
+    })
+  });
+
+  assert.equal(createResult.status, 201, "创建指令应返回 201");
+  assert.ok(createResult.body.command.id, "新建指令应返回 id");
+
+  const listResult = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  const newCmd = listResult.body.commands.find((c) => c.id === createResult.body.command.id);
+  assert.ok(newCmd, "新建指令应出现在列表中");
+  assert.equal(newCmd.action, "close_valve");
+  assert.equal(newCmd.reason, "manual");
+  assert.equal(newCmd.status, "issued");
+  assert.equal(newCmd.actorName, "运维值班员");
 });

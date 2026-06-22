@@ -108,8 +108,47 @@ function buildReport(data, homeId) {
   };
 }
 
+function buildCommands(data, user, filters = {}) {
+  const visibleIds = visibleHomeIds(data, user);
+  const { homeIds, actions, statuses } = filters;
+
+  let commands = data.commands.filter((command) => visibleIds.includes(command.homeId));
+
+  if (homeIds && homeIds.length) {
+    commands = commands.filter((command) => homeIds.includes(command.homeId));
+  }
+  if (actions && actions.length) {
+    commands = commands.filter((command) => actions.includes(command.action));
+  }
+  if (statuses && statuses.length) {
+    commands = commands.filter((command) => statuses.includes(command.status));
+  }
+
+  const userName = (id) =>
+    id ? (data.users.find((item) => item.id === id)?.name || "未知用户") : null;
+
+  return commands.map((command) => {
+    const home = data.homes.find((h) => h.id === command.homeId);
+    const device = data.devices.find((d) => d.id === command.deviceId);
+    return {
+      id: command.id,
+      homeId: command.homeId,
+      homeName: home?.name || "未知家庭",
+      deviceId: command.deviceId,
+      deviceName: device?.name || "未知设备",
+      action: command.action,
+      reason: command.reason,
+      actorId: command.actorId,
+      actorName: userName(command.actorId),
+      status: command.status,
+      createdAt: command.createdAt
+    };
+  });
+}
+
 module.exports = {
   visibleHomeIds,
   buildDashboard,
-  buildReport
+  buildReport,
+  buildCommands
 };

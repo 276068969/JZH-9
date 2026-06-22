@@ -331,6 +331,21 @@ select {
   color: var(--bad);
 }
 
+.tag.cmd-issued {
+  background: #e3edf3;
+  color: var(--brand-dark);
+}
+
+.tag.cmd-success {
+  background: #dff0e7;
+  color: var(--ok);
+}
+
+.tag.cmd-failed {
+  background: #fae5e7;
+  color: var(--bad);
+}
+
 .table-wrap {
   overflow: auto;
 }

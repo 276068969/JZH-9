@@ -211,7 +211,58 @@ function seedData() {
         status: "enabled"
       }
     ],
-    commands: [],
+    commands: [
+      {
+        id: "cmd_seed_1",
+        homeId: "home_101",
+        deviceId: "dev_valve_101",
+        action: "close_valve",
+        reason: "leak_detected",
+        actorId: "usr_admin",
+        status: "success",
+        createdAt: todayOffset(-5)
+      },
+      {
+        id: "cmd_seed_2",
+        homeId: "home_101",
+        deviceId: "dev_valve_101",
+        action: "open_valve",
+        reason: "console_control",
+        actorId: "usr_operator",
+        status: "success",
+        createdAt: todayOffset(-4)
+      },
+      {
+        id: "cmd_seed_3",
+        homeId: "home_202",
+        deviceId: "dev_meter_202",
+        action: "close_valve",
+        reason: "quota_exceeded",
+        actorId: "usr_admin",
+        status: "success",
+        createdAt: todayOffset(-3)
+      },
+      {
+        id: "cmd_seed_4",
+        homeId: "home_101",
+        deviceId: "dev_valve_101",
+        action: "close_valve",
+        reason: "alarm_triggered",
+        actorId: "usr_operator",
+        status: "issued",
+        createdAt: todayOffset(-1)
+      },
+      {
+        id: "cmd_seed_5",
+        homeId: "home_202",
+        deviceId: "dev_meter_202",
+        action: "open_valve",
+        reason: "console_control",
+        actorId: "usr_admin",
+        status: "failed",
+        createdAt: todayOffset(-2)
+      }
+    ],
     settings: {
       initialized: true,
       migrationVersion: 1
@@ -293,6 +344,33 @@ function runMigrations(data, store) {
     if (!data.settings) data.settings = {};
     data.settings.migrationVersion = 3;
     logs.push(`[MIGRATION] 版本 3 完成：补全 ${backfilled} 个告警的闭环追踪字段`);
+    dirty = true;
+  }
+
+  if (currentVersion < 4) {
+    logs.push(`[MIGRATION] 执行版本 4：为控制记录补充示例数据`);
+    if (!Array.isArray(data.commands)) {
+      data.commands = [];
+    }
+    if (data.commands.length === 0 && data.homes?.length && data.users?.length) {
+      const adminId = data.users.find((u) => u.role === "admin")?.id;
+      const operatorId = data.users.find((u) => u.role === "operator")?.id;
+      const valveDevice1 = data.devices?.find((d) => d.homeId === "home_101" && d.type === "valve");
+      const meterDevice1 = data.devices?.find((d) => d.homeId === "home_101" && d.type === "meter");
+      const meterDevice2 = data.devices?.find((d) => d.homeId === "home_202" && d.type === "meter");
+      const now = Date.now();
+      const sampleCommands = [
+        { id: randomId("cmd"), homeId: "home_101", deviceId: valveDevice1?.id || meterDevice1?.id, action: "close_valve", reason: "leak_detected", actorId: adminId, status: "success", createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: randomId("cmd"), homeId: "home_101", deviceId: valveDevice1?.id || meterDevice1?.id, action: "open_valve", reason: "console_control", actorId: operatorId, status: "success", createdAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: randomId("cmd"), homeId: "home_202", deviceId: meterDevice2?.id, action: "close_valve", reason: "quota_exceeded", actorId: adminId, status: "success", createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: randomId("cmd"), homeId: "home_101", deviceId: valveDevice1?.id || meterDevice1?.id, action: "close_valve", reason: "alarm_triggered", actorId: operatorId, status: "issued", createdAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: randomId("cmd"), homeId: "home_202", deviceId: meterDevice2?.id, action: "open_valve", reason: "console_control", actorId: adminId, status: "failed", createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString() }
+      ];
+      data.commands = sampleCommands.filter((c) => c.deviceId);
+      logs.push(`[MIGRATION] 版本 4 完成：新增 ${data.commands.length} 条示例控制记录`);
+    }
+    if (!data.settings) data.settings = {};
+    data.settings.migrationVersion = 4;
     dirty = true;
   }
 

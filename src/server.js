@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const { Store, verifyPassword } = require("./store");
 const { createSession, getSession, destroySession } = require("./auth");
-const { buildDashboard, buildReport, visibleHomeIds } = require("./analytics");
+const { buildDashboard, buildReport, buildCommands, visibleHomeIds } = require("./analytics");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const MIME_TYPES = {
@@ -199,6 +199,19 @@ function createApp(options = {}) {
       }
       const updated = store.addObjection(alertObjectionMatch[1], body, user);
       return send(res, 201, { alert: store.publicAlert(updated, { withHistory: true }) });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/commands") {
+      const { user } = requireUser(req);
+      const homeIdsParam = url.searchParams.get("homeIds");
+      const actionsParam = url.searchParams.get("actions");
+      const statusesParam = url.searchParams.get("statuses");
+      const filters = {
+        homeIds: homeIdsParam ? homeIdsParam.split(",").filter(Boolean) : null,
+        actions: actionsParam ? actionsParam.split(",").filter(Boolean) : null,
+        statuses: statusesParam ? statusesParam.split(",").filter(Boolean) : null
+      };
+      return send(res, 200, { commands: buildCommands(store.data, user, filters) });
     }
 
     if (req.method === "POST" && url.pathname === "/api/commands") {

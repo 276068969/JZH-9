@@ -68,7 +68,7 @@
       "name": "101 入户阀门",
       "type": "valve",
       "status": "online",
-      "valve": "open",
+      "valve": "closed",
       "battery": 79,
       "installedAt": "2025-09-01",
       "token": "dev_dev_valve_101_20c13acc22311568"
@@ -681,10 +681,71 @@
       "status": "enabled"
     }
   ],
-  "commands": [],
+  "commands": [
+    {
+      "id": "cmd_0981a1e11f",
+      "homeId": "home_101",
+      "deviceId": "dev_valve_101",
+      "action": "close_valve",
+      "reason": "manual",
+      "actorId": "usr_operator",
+      "status": "issued",
+      "createdAt": "2026-06-22T00:53:57.439Z"
+    },
+    {
+      "id": "cmd_seed_1",
+      "homeId": "home_101",
+      "deviceId": "dev_valve_101",
+      "action": "close_valve",
+      "reason": "leak_detected",
+      "actorId": "usr_admin",
+      "status": "success",
+      "createdAt": "2026-06-17T13:48:48.153Z"
+    },
+    {
+      "id": "cmd_seed_2",
+      "homeId": "home_101",
+      "deviceId": "dev_valve_101",
+      "action": "open_valve",
+      "reason": "console_control",
+      "actorId": "usr_operator",
+      "status": "success",
+      "createdAt": "2026-06-18T13:48:48.153Z"
+    },
+    {
+      "id": "cmd_seed_3",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "action": "close_valve",
+      "reason": "quota_exceeded",
+      "actorId": "usr_admin",
+      "status": "success",
+      "createdAt": "2026-06-19T13:48:48.153Z"
+    },
+    {
+      "id": "cmd_seed_4",
+      "homeId": "home_101",
+      "deviceId": "dev_valve_101",
+      "action": "close_valve",
+      "reason": "alarm_triggered",
+      "actorId": "usr_operator",
+      "status": "issued",
+      "createdAt": "2026-06-21T13:48:48.153Z"
+    },
+    {
+      "id": "cmd_seed_5",
+      "homeId": "home_202",
+      "deviceId": "dev_meter_202",
+      "action": "open_valve",
+      "reason": "console_control",
+      "actorId": "usr_admin",
+      "status": "failed",
+      "createdAt": "2026-06-20T13:48:48.153Z"
+    }
+  ],
   "settings": {
     "initialized": true,
-    "migrationVersion": 2
+    "migrationVersion": 4
   },
   "_migrations": [
     {

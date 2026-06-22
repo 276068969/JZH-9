@@ -5,7 +5,13 @@ const state = {
   view: "dashboard",
   selectedHomeIds: [],
   selectedAlertId: null,
-  selectedAlert: null
+  selectedAlert: null,
+  commands: [],
+  commandsFilters: {
+    homeIds: [],
+    actions: [],
+    statuses: []
+  }
 };
 
 const ROLE_LABEL = {
@@ -36,6 +42,26 @@ const LEVEL_LABEL = {
   high: "高",
   medium: "中",
   low: "低"
+};
+
+const COMMAND_ACTION_LABEL = {
+  open_valve: "开阀",
+  close_valve: "关阀"
+};
+
+const COMMAND_STATUS_LABEL = {
+  issued: "已下发",
+  success: "执行成功",
+  failed: "执行失败"
+};
+
+const COMMAND_REASON_LABEL = {
+  console_control: "控制台操作",
+  manual: "手动操作",
+  quota_exceeded: "配额超限",
+  alarm_triggered: "告警触发",
+  leak_detected: "漏水检测",
+  auto_schedule: "定时任务"
 };
 
 function qs(selector) {
@@ -125,6 +151,7 @@ function navButton(key, label) {
 
 function renderShell(content) {
   const adminNav = state.user.role === "admin" ? navButton("users", "用户管理") : "";
+  const commandNav = ["admin", "operator"].includes(state.user.role) ? navButton("commands", "控制记录") : "";
   qs("#app").innerHTML = `
     <section class="app-shell">
       <aside class="sidebar">
@@ -132,6 +159,7 @@ function renderShell(content) {
         <nav class="nav">
           ${navButton("dashboard", "运行总览")}
           ${navButton("homes", "家庭与设备")}
+          ${commandNav}
           ${navButton("alerts", "异常告警")}
           ${navButton("plans", "节水计划")}
           ${adminNav}
@@ -647,6 +675,164 @@ function renderPlans() {
   }
 }
 
+async function loadCommands() {
+  const params = new URLSearchParams();
+  if (state.commandsFilters.homeIds.length) {
+    params.set("homeIds", state.commandsFilters.homeIds.join(","));
+  }
+  if (state.commandsFilters.actions.length) {
+    params.set("actions", state.commandsFilters.actions.join(","));
+  }
+  if (state.commandsFilters.statuses.length) {
+    params.set("statuses", state.commandsFilters.statuses.join(","));
+  }
+  const query = params.toString();
+  const data = await api(`/api/commands${query ? "?" + query : ""}`);
+  state.commands = data.commands || [];
+}
+
+function renderCommands() {
+  const homes = state.dashboard?.homes || [];
+  const actionOptions = Object.entries(COMMAND_ACTION_LABEL);
+  const statusOptions = Object.entries(COMMAND_STATUS_LABEL);
+
+  const hasFilters = state.commandsFilters.homeIds.length ||
+    state.commandsFilters.actions.length ||
+    state.commandsFilters.statuses.length;
+
+  renderShell(`
+    <div class="topbar">
+      <div class="page-title">
+        <h1>控制记录</h1>
+        <p>查看开阀、关阀指令的下发与执行历史。</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshCommandsBtn">刷新</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="filter-bar" style="flex-wrap: wrap;">
+        <label class="filter-label">
+          家庭筛选
+          <select id="commandHomeFilter">
+            <option value="">全部家庭</option>
+            ${homes.map((home) => `<option value="${home.id}" ${state.commandsFilters.homeIds.includes(home.id) ? "selected" : ""}>${home.name}</option>`).join("")}
+          </select>
+        </label>
+        <label class="filter-label">
+          指令类型
+          <select id="commandActionFilter">
+            <option value="">全部类型</option>
+            ${actionOptions.map(([value, label]) => `<option value="${value}" ${state.commandsFilters.actions.includes(value) ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
+        <label class="filter-label">
+          执行状态
+          <select id="commandStatusFilter">
+            <option value="">全部状态</option>
+            ${statusOptions.map(([value, label]) => `<option value="${value}" ${state.commandsFilters.statuses.includes(value) ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
+        ${hasFilters ? `<button class="secondary" id="resetCommandFilters">重置筛选</button>` : ""}
+      </div>
+    </div>
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>家庭</th>
+            <th>设备</th>
+            <th>操作类型</th>
+            <th>下发人</th>
+            <th>原因</th>
+            <th>状态</th>
+            <th>时间</th>
+          </tr>
+        </thead>
+        <tbody id="commandsTableBody">
+          <tr><td colspan="7">加载中…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  `);
+
+  qs("#refreshCommandsBtn").addEventListener("click", () => renderCommands());
+
+  const homeFilter = qs("#commandHomeFilter");
+  if (homeFilter) {
+    homeFilter.addEventListener("change", async (e) => {
+      state.commandsFilters.homeIds = e.target.value ? [e.target.value] : [];
+      await loadCommands();
+      renderCommandsTable();
+    });
+  }
+
+  const actionFilter = qs("#commandActionFilter");
+  if (actionFilter) {
+    actionFilter.addEventListener("change", async (e) => {
+      state.commandsFilters.actions = e.target.value ? [e.target.value] : [];
+      await loadCommands();
+      renderCommandsTable();
+    });
+  }
+
+  const statusFilter = qs("#commandStatusFilter");
+  if (statusFilter) {
+    statusFilter.addEventListener("change", async (e) => {
+      state.commandsFilters.statuses = e.target.value ? [e.target.value] : [];
+      await loadCommands();
+      renderCommandsTable();
+    });
+  }
+
+  const resetBtn = qs("#resetCommandFilters");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", async () => {
+      state.commandsFilters = { homeIds: [], actions: [], statuses: [] };
+      await loadCommands();
+      renderCommands();
+    });
+  }
+
+  loadCommands().then(renderCommandsTable).catch((error) => {
+    const tbody = qs("#commandsTableBody");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="notice">${escapeHtml(error.message)}</td></tr>`;
+  });
+}
+
+function renderCommandsTable() {
+  const tbody = qs("#commandsTableBody");
+  if (!tbody) return;
+
+  const commands = state.commands;
+  if (!commands.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted);">暂无控制记录</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = commands
+    .map((cmd) => `
+      <tr>
+        <td>${escapeHtml(cmd.homeName)}</td>
+        <td>${escapeHtml(cmd.deviceName)}</td>
+        <td>
+          <span class="tag ${cmd.action === "open_valve" ? "resolved" : "disputed"}">
+            ${COMMAND_ACTION_LABEL[cmd.action] || cmd.action}
+          </span>
+        </td>
+        <td>${escapeHtml(cmd.actorName || "系统")}</td>
+        <td>${escapeHtml(COMMAND_REASON_LABEL[cmd.reason] || cmd.reason)}</td>
+        <td>
+          <span class="tag cmd-${cmd.status}">
+            ${COMMAND_STATUS_LABEL[cmd.status] || cmd.status}
+          </span>
+        </td>
+        <td>${formatDate(cmd.createdAt)}</td>
+      </tr>
+    `)
+    .join("");
+}
+
 async function renderUsers() {
   const data = await api("/api/users");
   renderShell(`
@@ -701,6 +887,7 @@ async function renderUsers() {
 
 function renderApp() {
   if (state.view === "homes") return renderHomes();
+  if (state.view === "commands" && ["admin", "operator"].includes(state.user.role)) return renderCommands();
   if (state.view === "alerts") return renderAlerts();
   if (state.view === "alertDetail") return renderAlertDetail();
   if (state.view === "plans") return renderPlans();
