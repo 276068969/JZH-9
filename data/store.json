@@ -683,6 +683,16 @@
   ],
   "commands": [
     {
+      "id": "cmd_6202c47c40",
+      "homeId": "home_101",
+      "deviceId": "dev_valve_101",
+      "action": "close_valve",
+      "reason": "manual",
+      "actorId": "usr_operator",
+      "status": "issued",
+      "createdAt": "2026-06-22T01:07:49.158Z"
+    },
+    {
       "id": "cmd_0981a1e11f",
       "homeId": "home_101",
       "deviceId": "dev_valve_101",
