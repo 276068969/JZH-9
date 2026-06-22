@@ -87,6 +87,12 @@ async function api(path, options = {}) {
     }
   });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401 && state.token) {
+    localStorage.removeItem("water_token");
+    state.token = null;
+    state.user = null;
+    renderLogin();
+  }
   if (!response.ok) throw new Error(data.message || "请求失败");
   return data;
 }

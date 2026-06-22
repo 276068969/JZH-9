@@ -40,8 +40,20 @@ function destroySession(token) {
   sessions.delete(token);
 }
 
+function destroySessionsByUserId(userId) {
+  let count = 0;
+  for (const [token, session] of sessions) {
+    if (session.userId === userId) {
+      sessions.delete(token);
+      count += 1;
+    }
+  }
+  return count;
+}
+
 module.exports = {
   createSession,
   getSession,
-  destroySession
+  destroySession,
+  destroySessionsByUserId
 };

@@ -2,7 +2,7 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const { Store, verifyPassword } = require("./store");
-const { createSession, getSession, destroySession } = require("./auth");
+const { createSession, getSession, destroySession, destroySessionsByUserId } = require("./auth");
 const { buildDashboard, buildReport, buildCommands, visibleHomeIds } = require("./analytics");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -48,15 +48,20 @@ function createApp(options = {}) {
 
   function currentUser(req) {
     const session = getSession(req);
-    if (!session) return { session: null, user: null };
-    const user = store.data.users.find((item) => item.id === session.userId && item.status === "active");
-    return { session, user };
+    if (!session) return { session: null, user: null, disabled: false };
+    const user = store.data.users.find((item) => item.id === session.userId);
+    if (!user) return { session: null, user: null, disabled: false };
+    if (user.status !== "active") {
+      destroySession(session.token);
+      return { session: null, user: null, disabled: true };
+    }
+    return { session, user, disabled: false };
   }
 
   function requireUser(req, roles) {
     const auth = currentUser(req);
     if (!auth.user) {
-      const error = new Error("请先登录");
+      const error = new Error(auth.disabled ? "账号已停用，请联系管理员" : "请先登录");
       error.status = 401;
       throw error;
     }
@@ -142,8 +147,14 @@ function createApp(options = {}) {
     if (userMatch && req.method === "PATCH") {
       requireUser(req, ["admin"]);
       const body = await parseBody(req);
+      const targetUser = store.data.users.find((item) => item.id === userMatch[1]);
+      if (!targetUser) return send(res, 404, { message: "用户不存在" });
+      const wasActive = targetUser.status === "active";
       const user = store.updateUser(userMatch[1], body);
-      return user ? send(res, 200, { user }) : send(res, 404, { message: "用户不存在" });
+      if (body.status !== undefined && wasActive && body.status !== "active") {
+        destroySessionsByUserId(userMatch[1]);
+      }
+      return send(res, 200, { user });
     }
 
     if (req.method === "GET" && url.pathname === "/api/homes") {
