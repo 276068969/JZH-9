@@ -746,8 +746,68 @@ test("resident user can only see commands for their own home", async (t) => {
     headers: { Authorization: `Bearer ${residentLogin.body.token}` }
   });
 
+  assert.equal(residentCommands.status, 200, "家庭用户应可正常访问控制记录接口");
   assert.ok(residentCommands.body.commands.every((c) => c.homeId === "home_101"), "家庭用户只能查看所属家庭的指令");
   assert.ok(residentCommands.body.commands.length <= adminCommands.body.commands.length, "家庭用户可见指令应不多于管理员");
+  assert.ok(residentCommands.body.commands.length > 0, "家庭用户应能看到其家庭下的指令记录");
+});
+
+test("resident user cannot POST commands (write restriction)", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const residentLogin = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "resident", password: "Home@123" })
+  });
+
+  const result = await request(baseUrl, "/api/commands", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${residentLogin.body.token}` },
+    body: JSON.stringify({
+      homeId: "home_101",
+      deviceId: "dev_valve_101",
+      action: "close_valve",
+      valve: "closed",
+      reason: "manual"
+    })
+  });
+
+  assert.equal(result.status, 403, "家庭用户不应有权下发控制指令");
+});
+
+test("operator user can access control records and issue commands", async (t) => {
+  const server = http.createServer(createApp());
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const login = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ account: "operator", password: "Ops@12345" })
+  });
+  const token = login.body.token;
+
+  const listResult = await request(baseUrl, "/api/commands", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.equal(listResult.status, 200, "运维员应可查看控制记录");
+  assert.ok(Array.isArray(listResult.body.commands), "运维员应看到指令列表");
+
+  const createResult = await request(baseUrl, "/api/commands", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      homeId: "home_101",
+      deviceId: "dev_valve_101",
+      action: "open_valve",
+      valve: "open",
+      reason: "console_control"
+    })
+  });
+  assert.equal(createResult.status, 201, "运维员应可下发控制指令");
 });
 
 test("POST /api/commands creates a command and appears in GET /api/commands", async (t) => {

@@ -151,7 +151,6 @@ function navButton(key, label) {
 
 function renderShell(content) {
   const adminNav = state.user.role === "admin" ? navButton("users", "用户管理") : "";
-  const commandNav = ["admin", "operator"].includes(state.user.role) ? navButton("commands", "控制记录") : "";
   qs("#app").innerHTML = `
     <section class="app-shell">
       <aside class="sidebar">
@@ -159,7 +158,7 @@ function renderShell(content) {
         <nav class="nav">
           ${navButton("dashboard", "运行总览")}
           ${navButton("homes", "家庭与设备")}
-          ${commandNav}
+          ${navButton("commands", "控制记录")}
           ${navButton("alerts", "异常告警")}
           ${navButton("plans", "节水计划")}
           ${adminNav}
@@ -887,7 +886,7 @@ async function renderUsers() {
 
 function renderApp() {
   if (state.view === "homes") return renderHomes();
-  if (state.view === "commands" && ["admin", "operator"].includes(state.user.role)) return renderCommands();
+  if (state.view === "commands") return renderCommands();
   if (state.view === "alerts") return renderAlerts();
   if (state.view === "alertDetail") return renderAlertDetail();
   if (state.view === "plans") return renderPlans();
